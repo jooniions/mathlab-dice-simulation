@@ -1,0 +1,1178 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>확률의 도입 - 주사위 실험</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React 18 & ReactDOM UMD CDN -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <!-- Babel Standalone (JSX 컴파일용) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Prop-Types & Recharts UMD CDN -->
+    <script src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js"></script>
+    <script src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js"></script>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans antialiased">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useMemo } = React;
+        const { 
+          BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Cell 
+        } = window.Recharts || {};
+
+        // --- SVG 아이콘 컴포넌트 ---
+        const IconBase = ({ children, className = "w-4 h-4", ...props }) => (
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+            {children}
+          </svg>
+        );
+
+        const IconDices = (p) => <IconBase {...p}><rect width="12" height="12" x="2" y="10" rx="2" /><path d="m17.92 14 3.5-3.5a2.24 2.24 0 0 0 0-3.15l-4.27-4.27a2.24 2.24 0 0 0-3.15 0L10.5 6.58" /><circle cx="6" cy="14" r="1" /><circle cx="10" cy="18" r="1" /><circle cx="15" cy="9" r="1" /></IconBase>;
+        const IconUser = (p) => <IconBase {...p}><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></IconBase>;
+        const IconUsers = (p) => <IconBase {...p}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></IconBase>;
+        const IconGraduationCap = (p) => <IconBase {...p}><path d="M22 10v6M2 10l10-5 10 5-10 5z" /><path d="M6 12v5c3 3 9 3 12 0v-5" /></IconBase>;
+        const IconPlay = (p) => <IconBase {...p}><polygon points="5 3 19 12 5 21 5 3" fill="currentColor" /></IconBase>;
+        const IconRotateCcw = (p) => <IconBase {...p}><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /></IconBase>;
+        const IconCheckCircle2 = (p) => <IconBase {...p}><circle cx="12" cy="12" r="10" /><path d="m9 12 2 2 4-4" /></IconBase>;
+        const IconHelpCircle = (p) => <IconBase {...p}><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><line x1="12" y1="17" x2="12.01" y2="17" /></IconBase>;
+        const IconSparkles = (p) => <IconBase {...p}><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3z" /></IconBase>;
+        const IconBarChart3 = (p) => <IconBase {...p}><path d="M3 3v18h18" /><path d="M18 17V9" /><path d="M13 17V5" /><path d="M8 17v-3" /></IconBase>;
+        const IconSettings = (p) => <IconBase {...p}><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" /></IconBase>;
+        const IconShieldAlert = (p) => <IconBase {...p}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></IconBase>;
+        const IconLayers = (p) => <IconBase {...p}><polygon points="12 2 2 7 12 12 22 7 12 2" /><polyline points="2 17 12 22 22 17" /><polyline points="2 12 12 17 22 12" /></IconBase>;
+        const IconChevronRight = (p) => <IconBase {...p}><polyline points="9 18 15 12 9 6" /></IconBase>;
+        const IconUserCheck = (p) => <IconBase {...p}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><polyline points="16 11 18 13 22 9" /></IconBase>;
+        const IconLogOut = (p) => <IconBase {...p}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></IconBase>;
+        const IconLock = (p) => <IconBase {...p}><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></IconBase>;
+        const IconRefreshCw = (p) => <IconBase {...p}><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" /><path d="M16 21h5v-5" /></IconBase>;
+        const IconArrowUpDown = (p) => <IconBase {...p}><path d="m21 16-4 4-4-4" /><path d="M17 20V4" /><path d="m3 8 4-4 4 4" /><path d="M7 4v16" /></IconBase>;
+        const IconArrowUp = (p) => <IconBase {...p}><line x1="12" y1="19" x2="12" y2="5" /><polyline points="5 12 12 5 19 12" /></IconBase>;
+        const IconArrowDown = (p) => <IconBase {...p}><line x1="12" y1="5" x2="12" y2="19" /><polyline points="19 12 12 19 5 12" /></IconBase>;
+
+        // --- 초기 학생 데이터 (0명 시작) ---
+        const INITIAL_STUDENTS = [];
+
+        // --- Web Audio API 기반 유리/크리스탈 주사위 효과음 생성기 ---
+        const playDiceRollSound = (isFast = false) => {
+          try {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContext) return;
+            const ctx = new AudioContext();
+            if (ctx.state === 'suspended') {
+              ctx.resume();
+            }
+            
+            const hits = isFast ? 2 : 4;
+            for (let i = 0; i < hits; i++) {
+              const delay = isFast ? i * 0.04 : i * 0.07 + Math.random() * 0.02;
+              const startTime = ctx.currentTime + delay;
+
+              // 1. 유리 공명 주음 (음역대: 1200Hz~1800Hz)
+              const glassOsc = ctx.createOscillator();
+              const glassGain = ctx.createGain();
+              const baseFreq = 1200 + Math.random() * 600;
+              const duration = isFast ? 0.05 : 0.09;
+
+              glassOsc.type = 'sine';
+              glassOsc.frequency.setValueAtTime(baseFreq, startTime);
+              glassOsc.frequency.exponentialRampToValueAtTime(baseFreq * 0.85, startTime + duration);
+
+              glassGain.gain.setValueAtTime(isFast ? 0.12 : 0.18, startTime);
+              glassGain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+
+              glassOsc.connect(glassGain);
+              glassGain.connect(ctx.destination);
+              glassOsc.start(startTime);
+              glassOsc.stop(startTime + duration);
+
+              // 2. 유리 맑은 배음 (2600Hz~3800Hz)
+              const overtoneOsc = ctx.createOscillator();
+              const overtoneGain = ctx.createGain();
+              const overtoneFreq = baseFreq * (2.0 + Math.random() * 0.3);
+
+              overtoneOsc.type = 'sine';
+              overtoneOsc.frequency.setValueAtTime(overtoneFreq, startTime);
+              
+              overtoneGain.gain.setValueAtTime(isFast ? 0.06 : 0.09, startTime);
+              overtoneGain.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.04);
+
+              overtoneOsc.connect(overtoneGain);
+              overtoneGain.connect(ctx.destination);
+              overtoneOsc.start(startTime);
+              overtoneOsc.stop(startTime + 0.04);
+
+              // 3. 바닥 접촉 타격음
+              const impactOsc = ctx.createOscillator();
+              const impactGain = ctx.createGain();
+              
+              impactOsc.type = 'triangle';
+              impactOsc.frequency.setValueAtTime(360, startTime);
+              impactOsc.frequency.exponentialRampToValueAtTime(75, startTime + 0.03);
+
+              impactGain.gain.setValueAtTime(0.08, startTime);
+              impactGain.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.03);
+
+              impactOsc.connect(impactGain);
+              impactGain.connect(ctx.destination);
+              impactOsc.start(startTime);
+              impactOsc.stop(startTime + 0.03);
+            }
+          } catch (e) {
+            // 오디오 생성 실패 시 무시
+          }
+        };
+
+        // --- 3D 주사위 각 면의 점(Dots) 컴포넌트 ---
+        function DiceFace({ number }) {
+          const getDots = () => {
+            switch (number) {
+              case 1:
+                return <div className="col-start-2 row-start-2 w-5 h-5 bg-indigo-900 rounded-full justify-self-center self-center shadow-inner" />;
+              case 2:
+                return (
+                  <>
+                    <div className="col-start-1 row-start-1 w-4 h-4 bg-indigo-800 rounded-full justify-self-center self-center" />
+                    <div className="col-start-3 row-start-3 w-4 h-4 bg-indigo-800 rounded-full justify-self-center self-center" />
+                  </>
+                );
+              case 3:
+                return (
+                  <>
+                    <div className="col-start-1 row-start-1 w-4 h-4 bg-indigo-800 rounded-full justify-self-center self-center" />
+                    <div className="col-start-2 row-start-2 w-4 h-4 bg-indigo-800 rounded-full justify-self-center self-center" />
+                    <div className="col-start-3 row-start-3 w-4 h-4 bg-indigo-800 rounded-full justify-self-center self-center" />
+                  </>
+                );
+              case 4:
+                return (
+                  <>
+                    <div className="col-start-1 row-start-1 w-4 h-4 bg-indigo-800 rounded-full justify-self-center self-center" />
+                    <div className="col-start-3 row-start-1 w-4 h-4 bg-indigo-800 rounded-full justify-self-center self-center" />
+                    <div className="col-start-1 row-start-3 w-4 h-4 bg-indigo-800 rounded-full justify-self-center self-center" />
+                    <div className="col-start-3 row-start-3 w-4 h-4 bg-indigo-800 rounded-full justify-self-center self-center" />
+                  </>
+                );
+              case 5:
+                return (
+                  <>
+                    <div className="col-start-1 row-start-1 w-4 h-4 bg-indigo-800 rounded-full justify-self-center self-center" />
+                    <div className="col-start-3 row-start-1 w-4 h-4 bg-indigo-800 rounded-full justify-self-center self-center" />
+                    <div className="col-start-2 row-start-2 w-4 h-4 bg-indigo-800 rounded-full justify-self-center self-center" />
+                    <div className="col-start-1 row-start-3 w-4 h-4 bg-indigo-800 rounded-full justify-self-center self-center" />
+                    <div className="col-start-3 row-start-3 w-4 h-4 bg-indigo-800 rounded-full justify-self-center self-center" />
+                  </>
+                );
+              case 6:
+                return (
+                  <>
+                    <div className="col-start-1 row-start-1 w-4 h-4 bg-indigo-800 rounded-full justify-self-center self-center" />
+                    <div className="col-start-3 row-start-1 w-4 h-4 bg-indigo-800 rounded-full justify-self-center self-center" />
+                    <div className="col-start-1 row-start-2 w-4 h-4 bg-indigo-800 rounded-full justify-self-center self-center" />
+                    <div className="col-start-3 row-start-2 w-4 h-4 bg-indigo-800 rounded-full justify-self-center self-center" />
+                    <div className="col-start-1 row-start-3 w-4 h-4 bg-indigo-800 rounded-full justify-self-center self-center" />
+                    <div className="col-start-3 row-start-3 w-4 h-4 bg-indigo-800 rounded-full justify-self-center self-center" />
+                  </>
+                );
+              default:
+                return null;
+            }
+          };
+
+          return (
+            <div className="w-full h-full p-2.5 bg-gradient-to-br from-white to-indigo-50 border-2 border-indigo-200 rounded-2xl grid grid-cols-3 grid-rows-3 shadow-md">
+              {getDots()}
+            </div>
+          );
+        }
+
+        // --- 3D 주사위 회전 컴포넌트 ---
+        function Dice3D({ rotation, transitionSpeed }) {
+          const durationClass = transitionSpeed === 'fast' ? 'duration-200' : 'duration-500';
+
+          return (
+            <div className="w-32 h-32 my-6 perspective-800 flex items-center justify-center">
+              <div 
+                className={`w-24 h-24 relative transform-style-3d transition-transform ${durationClass} ease-out`}
+                style={{
+                  transform: `rotateX(${rotation.x}deg) rotateY(${rotation.y}deg)`
+                }}
+              >
+                <div className="absolute w-24 h-24 translate-z-12"><DiceFace number={1} /></div>
+                <div className="absolute w-24 h-24 rotate-y-180 translate-z-12"><DiceFace number={6} /></div>
+                <div className="absolute w-24 h-24 rotate-y-90 translate-z-12"><DiceFace number={2} /></div>
+                <div className="absolute w-24 h-24 -rotate-y-90 translate-z-12"><DiceFace number={5} /></div>
+                <div className="absolute w-24 h-24 rotate-x-90 translate-z-12"><DiceFace number={3} /></div>
+                <div className="absolute w-24 h-24 -rotate-x-90 translate-z-12"><DiceFace number={4} /></div>
+              </div>
+            </div>
+          );
+        }
+
+        // 누적 회전각 계산 함수
+        const getNextRotation = (currentRot, targetValue, isFast) => {
+          const baseAngles = {
+            1: { x: 0, y: 0 },
+            2: { x: 0, y: -90 },
+            3: { x: -90, y: 0 },
+            4: { x: 90, y: 0 },
+            5: { x: 0, y: 90 },
+            6: { x: 0, y: 180 }
+          };
+          const target = baseAngles[targetValue] || { x: 0, y: 0 };
+          const extraTurns = isFast ? 360 : 720;
+
+          const getNextAngle = (current, targetBase) => {
+            const currentMod = current % 360;
+            let diff = (targetBase - currentMod) % 360;
+            if (diff < 0) diff += 360;
+            return current + extraTurns + diff;
+          };
+
+          return {
+            x: getNextAngle(currentRot.x, target.x),
+            y: getNextAngle(currentRot.y, target.y)
+          };
+        };
+
+        function App() {
+          const [viewMode, setViewMode] = useState('login');
+          const [loginType, setLoginType] = useState('student');
+          const [teacherPass, setTeacherPass] = useState('');
+          const [teacherAuthError, setTeacherAuthError] = useState(false);
+
+          const [inputClass, setInputClass] = useState('');
+          const [inputNumber, setInputNumber] = useState('');
+          const [inputName, setInputName] = useState('');
+          const [currentStudentId, setCurrentStudentId] = useState(null);
+
+          const [diceRotation, setDiceRotation] = useState({ x: 0, y: 0 });
+          const [currentDiceValue, setCurrentDiceValue] = useState(1);
+          const [isRolling, setIsRolling] = useState(false);
+          const [transitionSpeed, setTransitionSpeed] = useState('normal');
+
+          const [students, setStudents] = useState(INITIAL_STUDENTS);
+          const [groupCount, setGroupCount] = useState(3);
+          const [selectedTeacherTab, setSelectedTeacherTab] = useState('overview');
+          const [activeGroupFilter, setActiveGroupFilter] = useState(1);
+          const [isActivityPaused, setIsActivityPaused] = useState(false);
+
+          const [sortKey, setSortKey] = useState(null);
+          const [sortOrder, setSortOrder] = useState('asc');
+
+          const handleSort = (key) => {
+            if (sortKey === key) {
+              setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+            } else {
+              setSortKey(key);
+              setSortOrder(key === 'total' ? 'desc' : 'asc');
+            }
+          };
+
+          const resetSort = () => {
+            setSortKey(null);
+            setSortOrder('asc');
+          };
+
+          const sortedStudents = useMemo(() => {
+            if (!sortKey) return students;
+
+            return [...students].sort((a, b) => {
+              const valA = a[sortKey];
+              const valB = b[sortKey];
+
+              if (sortKey === 'studentNum' || sortKey === 'name') {
+                const cmp = String(valA).localeCompare(String(valB), 'ko', { numeric: true });
+                return sortOrder === 'asc' ? cmp : -cmp;
+              } else {
+                if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+                if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+                return 0;
+              }
+            });
+          }, [students, sortKey, sortOrder]);
+
+          const renderSortIcon = (key) => {
+            if (sortKey !== key) {
+              return <IconArrowUpDown className="w-3.5 h-3.5 text-slate-400 opacity-60 group-hover:opacity-100 transition-opacity" />;
+            }
+            return sortOrder === 'asc' 
+              ? <IconArrowUp className="w-3.5 h-3.5 text-indigo-600" />
+              : <IconArrowDown className="w-3.5 h-3.5 text-indigo-600" />;
+          };
+
+          const currentStudent = useMemo(() => {
+            return students.find(s => s.id === currentStudentId) || null;
+          }, [students, currentStudentId]);
+
+          const handleStudentLogin = (e) => {
+            e.preventDefault();
+            if (!inputClass.trim() || !inputNumber.trim() || !inputName.trim()) return;
+
+            const formattedNum = `2학년 ${inputClass}반 ${inputNumber}번`;
+            const existing = students.find(s => s.studentNum === formattedNum);
+            if (existing) {
+              setCurrentStudentId(existing.id);
+            } else {
+              const newStudent = {
+                id: Date.now().toString(),
+                studentNum: formattedNum,
+                name: inputName.trim(),
+                groupId: 1,
+                counts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
+                total: 0,
+                logs: []
+              };
+              setStudents(prev => [...prev, newStudent]);
+              setCurrentStudentId(newStudent.id);
+            }
+            setViewMode('student');
+          };
+
+          const handleTeacherLogin = (e) => {
+            e.preventDefault();
+            if (teacherPass === '1129') {
+              setTeacherAuthError(false);
+              setViewMode('teacher');
+              setTeacherPass('');
+            } else {
+              setTeacherAuthError(true);
+            }
+          };
+
+          const startDiceRoll = async (count) => {
+            if (!currentStudentId || isActivityPaused || isRolling) return;
+
+            setIsRolling(true);
+            const isFast = count > 1;
+            setTransitionSpeed(isFast ? 'fast' : 'normal');
+            const stepDelay = isFast ? 230 : 550;
+
+            for (let i = 0; i < count; i++) {
+              playDiceRollSound(isFast);
+              const result = Math.floor(Math.random() * 6) + 1;
+              setCurrentDiceValue(result);
+
+              setDiceRotation(prev => getNextRotation(prev, result, isFast));
+
+              setStudents(prev => prev.map(st => {
+                if (st.id === currentStudentId) {
+                  const newCounts = { ...st.counts, [result]: st.counts[result] + 1 };
+                  const newTotal = st.total + 1;
+                  const newLog = { id: Date.now() + Math.random(), round: newTotal, value: result };
+                  return {
+                    ...st,
+                    counts: newCounts,
+                    total: newTotal,
+                    logs: [newLog, ...st.logs].slice(0, 50)
+                  };
+                }
+                return st;
+              }));
+
+              await new Promise(resolve => setTimeout(resolve, stepDelay));
+            }
+
+            setIsRolling(false);
+          };
+
+          const resetStudentData = () => {
+            if (!currentStudentId) return;
+            setStudents(prev => prev.map(st => {
+              if (st.id === currentStudentId) {
+                return {
+                  ...st,
+                  counts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
+                  total: 0,
+                  logs: []
+                };
+              }
+              return st;
+            }));
+          };
+
+          const handleKickStudent = (studentId) => {
+            setStudents(prev => prev.filter(s => s.id !== studentId));
+            if (currentStudentId === studentId) {
+              setCurrentStudentId(null);
+            }
+          };
+
+          const handleGroupChange = (studentId, newGroupId) => {
+            setStudents(prev => prev.map(st => st.id === studentId ? { ...st, groupId: Number(newGroupId) } : st));
+          };
+
+          const handleAutoAssignGroups = () => {
+            setStudents(prev => {
+              return prev.map((st, idx) => ({
+                ...st,
+                groupId: (idx % groupCount) + 1
+              }));
+            });
+          };
+
+          const handleResetAllData = () => {
+            setStudents(prev => prev.map(st => ({
+              ...st,
+              counts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
+              total: 0,
+              logs: []
+            })));
+          };
+
+          const calculateChartData = (countsObj, totalCount) => {
+            const theoretical = 0.167;
+            return [1, 2, 3, 4, 5, 6].map(num => {
+              const count = countsObj[num] || 0;
+              const relativeFreq = totalCount > 0 ? Number((count / totalCount).toFixed(3)) : 0;
+              return {
+                face: `${num}의 눈`,
+                num: num,
+                count: count,
+                relativeFreq: relativeFreq,
+                theoretical: theoretical
+              };
+            });
+          };
+
+          const getGroupAggregate = (gId) => {
+            const groupStudents = students.filter(s => s.groupId === gId);
+            const combinedCounts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
+            let combinedTotal = 0;
+
+            groupStudents.forEach(st => {
+              combinedTotal += st.total;
+              Object.keys(st.counts).forEach(k => {
+                combinedCounts[k] += st.counts[k];
+              });
+            });
+
+            return {
+              studentCount: groupStudents.length,
+              total: combinedTotal,
+              counts: combinedCounts,
+              chartData: calculateChartData(combinedCounts, combinedTotal)
+            };
+          };
+
+          const getClassAggregate = () => {
+            const combinedCounts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
+            let combinedTotal = 0;
+
+            students.forEach(st => {
+              combinedTotal += st.total;
+              Object.keys(st.counts).forEach(k => {
+                combinedCounts[k] += st.counts[k];
+              });
+            });
+
+            return {
+              studentCount: students.length,
+              total: combinedTotal,
+              counts: combinedCounts,
+              chartData: calculateChartData(combinedCounts, combinedTotal)
+            };
+          };
+
+          return (
+            <div className="min-h-screen bg-slate-50 text-slate-800 font-sans">
+              
+              <style>{`
+                .perspective-800 { perspective: 800px; }
+                .transform-style-3d { transform-style: preserve-3d; }
+                .translate-z-12 { transform: translateZ(48px); }
+                .rotate-y-90 { transform: rotateY(90deg) translateZ(48px); }
+                .-rotate-y-90 { transform: rotateY(-90deg) translateZ(48px); }
+                .rotate-y-180 { transform: rotateY(180deg) translateZ(48px); }
+                .rotate-x-90 { transform: rotateX(90deg) translateZ(48px); }
+                .-rotate-x-90 { transform: rotateX(-90deg) translateZ(48px); }
+              `}</style>
+
+              <header className="bg-indigo-700 text-white shadow-md sticky top-0 z-50">
+                <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2 bg-indigo-600 rounded-xl shadow-inner">
+                      <IconDices className="w-6 h-6 text-yellow-300 animate-pulse" />
+                    </div>
+                    <div>
+                      <h1 className="font-extrabold text-lg leading-tight">확률의 도입 - 주사위 실험</h1>
+                      <p className="text-xs text-indigo-200">중2 수학 · Ⅵ-1-2 확률의 개념</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    {viewMode !== 'login' && (
+                      <>
+                        <span className="hidden sm:inline-block px-3 py-1 bg-indigo-800 rounded-full text-xs text-indigo-100 font-medium">
+                          {viewMode === 'student' ? `학생: ${currentStudent?.studentNum} ${currentStudent?.name}` : '교사 관리자 모드'}
+                        </span>
+                        <button 
+                          onClick={() => setViewMode('login')}
+                          className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-xs font-semibold transition-colors flex items-center space-x-1 shadow-sm"
+                        >
+                          <IconLogOut className="w-3.5 h-3.5" />
+                          <span>로그아웃</span>
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </header>
+
+              <main className="max-w-7xl mx-auto p-4 sm:p-6">
+                
+                {/* 1. 로그인 화면 */}
+                {viewMode === 'login' && (
+                  <div className="flex flex-col items-center justify-between min-h-[calc(100vh-140px)] py-4">
+                    <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden my-auto">
+                      <div className="bg-indigo-600 p-6 text-white text-center relative overflow-hidden">
+                        <div className="absolute -right-4 -bottom-4 opacity-10">
+                          <IconDices className="w-36 h-36" />
+                        </div>
+                        <h2 className="text-2xl font-extrabold mb-1">수학 탐구 교실</h2>
+                        <p className="text-indigo-100 text-xs">주사위 실험을 통해 확률의 개념을 학습해보세요!</p>
+                        
+                        <div className="flex mt-6 bg-indigo-800/50 p-1 rounded-xl">
+                          <button 
+                            onClick={() => setLoginType('student')}
+                            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${loginType === 'student' ? 'bg-white text-indigo-700 shadow-md' : 'text-indigo-200 hover:text-white'}`}
+                          >
+                            <IconUser className="w-4 h-4 inline-block mr-1" /> 학생 접속
+                          </button>
+                          <button 
+                            onClick={() => setLoginType('teacher')}
+                            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${loginType === 'teacher' ? 'bg-white text-indigo-700 shadow-md' : 'text-indigo-200 hover:text-white'}`}
+                          >
+                            <IconGraduationCap className="w-4 h-4 inline-block mr-1" /> 교사 접속
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="p-6">
+                        {loginType === 'student' ? (
+                          <form onSubmit={handleStudentLogin} className="space-y-4">
+                            <div>
+                              <label className="block text-xs font-bold text-slate-600 mb-1">학년</label>
+                              <input 
+                                type="text"
+                                value="2학년"
+                                disabled
+                                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-100 text-slate-500 font-bold text-sm cursor-not-allowed"
+                              />
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label className="block text-xs font-bold text-slate-600 mb-1">반</label>
+                                <div className="relative flex items-center">
+                                  <input 
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={inputClass}
+                                    onChange={(e) => setInputClass(e.target.value.replace(/\D/g, ''))}
+                                    required
+                                    className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 text-sm font-semibold pr-8"
+                                  />
+                                  <span className="absolute right-3 text-xs text-slate-400 font-bold">반</span>
+                                </div>
+                              </div>
+                              <div>
+                                <label className="block text-xs font-bold text-slate-600 mb-1">번호</label>
+                                <div className="relative flex items-center">
+                                  <input 
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={inputNumber}
+                                    onChange={(e) => setInputNumber(e.target.value.replace(/\D/g, ''))}
+                                    required
+                                    className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 text-sm font-semibold pr-8"
+                                  />
+                                  <span className="absolute right-3 text-xs text-slate-400 font-bold">번</span>
+                                </div>
+                              </div>
+                            </div>
+                            <div>
+                              <label className="block text-xs font-bold text-slate-600 mb-1">이름</label>
+                              <input 
+                                type="text"
+                                placeholder="이름을 입력하세요"
+                                value={inputName}
+                                onChange={(e) => setInputName(e.target.value)}
+                                required
+                                className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 text-sm"
+                              />
+                            </div>
+                            <button 
+                              type="submit"
+                              className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg shadow-indigo-200 transition-all text-sm mt-2 flex items-center justify-center space-x-2"
+                            >
+                              <span>실험실 입장하기</span>
+                              <IconChevronRight className="w-4 h-4" />
+                            </button>
+                          </form>
+                        ) : (
+                          <form onSubmit={handleTeacherLogin} className="space-y-4">
+                            <div>
+                              <label className="block text-xs font-bold text-slate-600 mb-1">교사 비밀번호</label>
+                              <div className="relative">
+                                <input 
+                                  type="password"
+                                  placeholder="비밀번호 입력"
+                                  value={teacherPass}
+                                  onChange={(e) => setTeacherPass(e.target.value)}
+                                  className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 text-sm"
+                                />
+                                <IconLock className="w-4 h-4 text-slate-400 absolute right-3 top-3" />
+                              </div>
+                              {teacherAuthError && (
+                                <p className="text-xs text-rose-500 mt-1">비밀번호가 올바르지 않습니다.</p>
+                              )}
+                            </div>
+                            <button 
+                              type="submit"
+                              className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg shadow-emerald-200 transition-all text-sm flex items-center justify-center space-x-2"
+                            >
+                              <IconGraduationCap className="w-5 h-5" />
+                              <span>교사 관리자 화면 이동</span>
+                            </button>
+                          </form>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="w-full text-center mt-auto pt-6 pb-2">
+                      <div className="w-48 mx-auto border-t border-slate-200/70 mb-3" />
+                      <p className="text-[11px] text-slate-400 font-medium flex items-center justify-center space-x-2">
+                        <span>제작 · hyjoon.school@gmail.com</span>
+                        <span className="text-slate-200">|</span>
+                        <span>배포 버전 · Ver1.0 (2026. 11. 3.)</span>
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* 2. 학생 화면 */}
+                {viewMode === 'student' && currentStudent && (
+                  <div className="space-y-6">
+                    {isActivityPaused && (
+                      <div className="bg-amber-500 text-white px-4 py-3 rounded-xl shadow-md flex items-center space-x-3 animate-bounce">
+                        <IconShieldAlert className="w-6 h-6 flex-shrink-0" />
+                        <span className="font-bold text-sm">교사 제어로 인해 주사위 던지기가 일시정지 되었습니다. 선생님의 안내를 기다려주세요!</span>
+                      </div>
+                    )}
+
+                    <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                      <div className="flex items-start space-x-3">
+                        <div className="p-2.5 bg-indigo-600 text-white rounded-xl shadow-sm mt-1 md:mt-0">
+                          <IconHelpCircle className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-indigo-950 text-base">탐구 목표</h3>
+                          <p className="text-xs md:text-sm text-indigo-800 font-medium mt-0.5">
+                            주사위를 반복해서 던질 때, 각 눈이 나온 횟수의 상대도수가 경우의 수의 비율 1/6(≈ 0.167)에 가까워지는지 확인해보세요.
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2 self-end md:self-auto">
+                        <span className="text-xs font-bold bg-white text-indigo-700 border border-indigo-200 px-3 py-1.5 rounded-xl shadow-sm">
+                          소속: {currentStudent.groupId}모둠
+                        </span>
+                        <button 
+                          onClick={resetStudentData}
+                          disabled={isRolling || isActivityPaused}
+                          className="px-3 py-1.5 bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 rounded-xl text-xs font-bold transition-all flex items-center space-x-1 shadow-sm disabled:opacity-50"
+                        >
+                          <IconRotateCcw className="w-3.5 h-3.5" />
+                          <span>내 기록 초기화</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                      <div className="lg:col-span-5 space-y-6">
+                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 text-center flex flex-col items-center justify-center">
+                          <span className="text-xs font-bold text-slate-500">던지기 버튼을 눌러 주사위를 굴려보세요!</span>
+                          <Dice3D rotation={diceRotation} transitionSpeed={transitionSpeed} />
+                          <p className="text-sm font-bold text-slate-700 mb-4">
+                            총 던진 횟수: <span className="text-indigo-600 text-xl font-black">{currentStudent.total}회</span>
+                          </p>
+
+                          <div className="grid grid-cols-2 gap-3 w-full">
+                            <button 
+                              onClick={() => startDiceRoll(1)}
+                              disabled={isRolling || isActivityPaused}
+                              className="py-3 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-bold text-sm rounded-xl shadow-md transition-all flex items-center justify-center space-x-1.5 disabled:opacity-50 cursor-pointer"
+                            >
+                              <IconPlay className="w-4 h-4 fill-white" />
+                              <span>1회 던지기</span>
+                            </button>
+                            <button 
+                              onClick={() => startDiceRoll(10)}
+                              disabled={isRolling || isActivityPaused}
+                              className="py-3 bg-purple-600 hover:bg-purple-700 active:scale-95 text-white font-bold text-sm rounded-xl shadow-md transition-all flex items-center justify-center space-x-1.5 disabled:opacity-50 cursor-pointer"
+                            >
+                              <IconRefreshCw className={`w-4 h-4 ${isRolling ? 'animate-spin' : ''}`} />
+                              <span>10회 연속 던지기</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                          <h4 className="text-xs font-bold text-slate-700 mb-3 flex items-center justify-between">
+                            <span>최근 던지기 기록</span>
+                            <span className="text-[10px] text-slate-400 font-normal">최신 50개</span>
+                          </h4>
+                          {currentStudent.logs.length === 0 ? (
+                            <div className="text-center py-6 text-slate-400 text-xs">
+                              주사위 던지기 버튼을 클릭하세요!
+                            </div>
+                          ) : (
+                            <div className="max-h-40 overflow-y-auto pr-1 space-y-1.5">
+                              {currentStudent.logs.map((log) => (
+                                <div key={log.id} className="flex justify-between items-center bg-slate-50 px-3 py-1.5 rounded-lg text-xs border border-slate-100">
+                                  <span className="text-slate-500 font-medium">{log.round}회차</span>
+                                  <span className="font-bold text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded border border-indigo-100">
+                                    눈 {log.value}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="lg:col-span-7 space-y-6">
+                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                          <div className="flex justify-between items-center mb-4">
+                            <div>
+                              <h4 className="text-base font-bold text-slate-800 flex items-center space-x-2">
+                                <IconBarChart3 className="w-5 h-5 text-indigo-600" />
+                                <span>개인 상대도수 그래프</span>
+                              </h4>
+                              <p className="text-xs text-slate-500">각 눈의 상대도수를 경우의 수의 비율 1/6(≈ 0.167)과 비교해보세요.</p>
+                            </div>
+                          </div>
+
+                          <div className="h-64 w-full mb-6">
+                            {Recharts && (
+                              <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={calculateChartData(currentStudent.counts, currentStudent.total)}>
+                                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                  <XAxis dataKey="face" tick={{ fontSize: 12, fill: '#64748b' }} />
+                                  <YAxis domain={[0, 0.40]} tick={{ fontSize: 12, fill: '#64748b' }} />
+                                  <Tooltip formatter={(value, name) => [value, name === 'relativeFreq' ? '상대도수' : '이론적 확률']} />
+                                  <ReferenceLine y={0.167} stroke="#ef4444" strokeDasharray="4 4" strokeWidth={2} label={{ value: '1/6 (0.167)', fill: '#ef4444', fontSize: 11, position: 'top' }} />
+                                  <Bar dataKey="relativeFreq" name="relativeFreq" fill="#6366f1" radius={[6, 6, 0, 0]}>
+                                    {calculateChartData(currentStudent.counts, currentStudent.total).map((entry, index) => (
+                                      <Cell key={`cell-${index}`} fill={entry.relativeFreq === 0 ? '#cbd5e1' : '#6366f1'} />
+                                    ))}
+                                  </Bar>
+                                </BarChart>
+                              </ResponsiveContainer>
+                            )}
+                          </div>
+
+                          <div className="border-t border-slate-100 pt-5">
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-center text-xs sm:text-sm">
+                                <thead>
+                                  <tr className="bg-slate-100 text-slate-600 font-bold border-b border-slate-200">
+                                    <th className="py-2.5 px-3 rounded-l-lg">주사위의 눈</th>
+                                    <th className="py-2.5 px-3">나온 횟수</th>
+                                    <th className="py-2.5 px-3 rounded-r-lg">상대도수</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                  {[1, 2, 3, 4, 5, 6].map(num => {
+                                    const count = currentStudent.counts[num] || 0;
+                                    const rel = currentStudent.total > 0 ? (count / currentStudent.total).toFixed(3) : '0.000';
+                                    return (
+                                      <tr key={num} className="hover:bg-slate-50 transition-colors">
+                                        <td className="py-2.5 font-bold text-indigo-700 bg-indigo-50/50">{num}</td>
+                                        <td className="py-2.5 text-slate-700 font-semibold">{count}회</td>
+                                        <td className="py-2.5 font-mono font-bold text-slate-800">{rel}</td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                                <tfoot>
+                                  <tr className="bg-indigo-50/80 font-bold text-indigo-900 border-t-2 border-indigo-200">
+                                    <td className="py-2.5">합계</td>
+                                    <td className="py-2.5">{currentStudent.total}회</td>
+                                    <td className="py-2.5 font-mono">{currentStudent.total > 0 ? '1.000' : '0.000'}</td>
+                                  </tr>
+                                </tfoot>
+                              </table>
+                            </div>
+                          </div>
+
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 3. 교사 화면 */}
+                {viewMode === 'teacher' && (
+                  <div className="space-y-6">
+                    <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                      <div>
+                        <h2 className="text-xl font-black text-slate-800 flex items-center space-x-2">
+                          <IconGraduationCap className="w-6 h-6 text-indigo-600" />
+                          <span>교사 대시보드 및 학급 관리</span>
+                        </h2>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          현재 접속 학생: <span className="font-bold text-slate-800">{students.length}명</span> | 
+                          학급 총 던진 횟수: <span className="font-bold text-indigo-600">{getClassAggregate().total}회</span>
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button 
+                          onClick={() => setIsActivityPaused(!isActivityPaused)}
+                          className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center space-x-1 shadow-sm ${
+                            isActivityPaused ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-amber-500 text-white hover:bg-amber-600'
+                          }`}
+                        >
+                          <IconShieldAlert className="w-4 h-4" />
+                          <span>{isActivityPaused ? '학생 활동 재개' : '학생 활동 일시정지'}</span>
+                        </button>
+                        <button 
+                          onClick={handleResetAllData}
+                          className="px-3 py-2 bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100 rounded-xl text-xs font-bold transition-all flex items-center space-x-1 shadow-sm"
+                        >
+                          <IconRotateCcw className="w-4 h-4" />
+                          <span>학급 기록 전체 초기화</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex space-x-2 border-b border-slate-200 pb-2">
+                      <button 
+                        onClick={() => setSelectedTeacherTab('overview')}
+                        className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 ${
+                          selectedTeacherTab === 'overview' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                        }`}
+                      >
+                        <IconUserCheck className="w-4 h-4" />
+                        <span>학생 관리 및 모둠 변경</span>
+                      </button>
+
+                      <button 
+                        onClick={() => setSelectedTeacherTab('groups')}
+                        className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 ${
+                          selectedTeacherTab === 'groups' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                        }`}
+                      >
+                        <IconUsers className="w-4 h-4" />
+                        <span>모둠별 합산 상대도수</span>
+                      </button>
+
+                      <button 
+                        onClick={() => setSelectedTeacherTab('aggregate')}
+                        className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 ${
+                          selectedTeacherTab === 'aggregate' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                        }`}
+                      >
+                        <IconLayers className="w-4 h-4" />
+                        <span>학급 전체 수렴 시각화 (대수의 법칙)</span>
+                      </button>
+                    </div>
+
+                    {selectedTeacherTab === 'overview' && (
+                      <div className="space-y-6">
+                        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row items-center justify-between gap-4">
+                          <div className="flex items-center space-x-3 w-full md:w-auto">
+                            <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
+                              <IconSettings className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <h4 className="text-sm font-bold text-slate-800">모둠 수 설정 및 자동 균등 배정</h4>
+                              <p className="text-xs text-slate-500">학생들을 원하는 개수의 모둠으로 자동 분배합니다.</p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center space-x-3 w-full md:w-auto justify-end">
+                            <div className="flex items-center space-x-2">
+                              <span className="text-xs font-bold text-slate-600">모둠 수:</span>
+                              <select 
+                                value={groupCount}
+                                onChange={(e) => setGroupCount(Number(e.target.value))}
+                                className="px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                              >
+                                {[2, 3, 4, 5, 6, 7, 8].map(n => (
+                                  <option key={n} value={n}>{n}개 모둠</option>
+                                ))}
+                              </select>
+                            </div>
+
+                            <button 
+                              onClick={handleAutoAssignGroups}
+                              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs shadow-md transition-all flex items-center space-x-1"
+                            >
+                              <IconUsers className="w-4 h-4" />
+                              <span>모둠 자동 배정</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                          <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
+                            <h4 className="font-bold text-slate-800 text-sm">접속 학생 명단 ({students.length}명)</h4>
+                            <button 
+                              onClick={resetSort}
+                              className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold transition-all flex items-center space-x-1"
+                            >
+                              <IconRotateCcw className="w-3 h-3" />
+                              <span>정렬 초기화</span>
+                            </button>
+                          </div>
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-left text-xs sm:text-sm">
+                              <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200 select-none">
+                                <tr>
+                                  <th onClick={() => handleSort('studentNum')} className="py-3 px-4 cursor-pointer hover:bg-slate-100 transition-colors">
+                                    <div className="flex items-center space-x-1 group">
+                                      <span>학번</span>
+                                      {renderSortIcon('studentNum')}
+                                    </div>
+                                  </th>
+                                  <th onClick={() => handleSort('name')} className="py-3 px-4 cursor-pointer hover:bg-slate-100 transition-colors">
+                                    <div className="flex items-center space-x-1 group">
+                                      <span>이름</span>
+                                      {renderSortIcon('name')}
+                                    </div>
+                                  </th>
+                                  <th onClick={() => handleSort('groupId')} className="py-3 px-4 cursor-pointer hover:bg-slate-100 transition-colors">
+                                    <div className="flex items-center space-x-1 group">
+                                      <span>소속 모둠</span>
+                                      {renderSortIcon('groupId')}
+                                    </div>
+                                  </th>
+                                  <th onClick={() => handleSort('total')} className="py-3 px-4 text-center cursor-pointer hover:bg-slate-100 transition-colors">
+                                    <div className="flex items-center justify-center space-x-1 group">
+                                      <span>던진 횟수</span>
+                                      {renderSortIcon('total')}
+                                    </div>
+                                  </th>
+                                  <th className="py-3 px-4 text-center">관리</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100">
+                                {sortedStudents.length === 0 ? (
+                                  <tr>
+                                    <td colSpan={5} className="py-8 text-center text-slate-400 text-xs">
+                                      접속한 학생이 없습니다.
+                                    </td>
+                                  </tr>
+                                ) : (
+                                  sortedStudents.map(st => (
+                                    <tr key={st.id} className="hover:bg-slate-50 transition-colors">
+                                      <td className="py-3 px-4 font-mono font-medium text-slate-600">{st.studentNum}</td>
+                                      <td className="py-3 px-4 font-bold text-slate-800">{st.name}</td>
+                                      <td className="py-3 px-4">
+                                        <select 
+                                          value={st.groupId}
+                                          onChange={(e) => handleGroupChange(st.id, e.target.value)}
+                                          className="px-3 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg font-bold text-xs focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                                        >
+                                          {Array.from({ length: groupCount }, (_, i) => i + 1).map(gNum => (
+                                            <option key={gNum} value={gNum}>{gNum}모둠</option>
+                                          ))}
+                                        </select>
+                                      </td>
+                                      <td className="py-3 px-4 text-center font-bold text-indigo-600">{st.total}회</td>
+                                      <td className="py-3 px-4 text-center">
+                                        <button 
+                                          onClick={() => handleKickStudent(st.id)}
+                                          className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 rounded-lg text-xs font-bold transition-all flex items-center justify-center space-x-1 mx-auto"
+                                        >
+                                          <IconLogOut className="w-3.5 h-3.5" />
+                                          <span>퇴장</span>
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  ))
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {selectedTeacherTab === 'groups' && (
+                      <div className="space-y-6">
+                        <div className="flex space-x-2 overflow-x-auto pb-1">
+                          {Array.from({ length: groupCount }, (_, i) => i + 1).map(gId => {
+                            const gData = getGroupAggregate(gId);
+                            return (
+                              <button 
+                                key={gId}
+                                onClick={() => setActiveGroupFilter(gId)}
+                                className={`px-4 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center space-x-2 whitespace-nowrap border ${
+                                  activeGroupFilter === gId ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                                }`}
+                              >
+                                <IconUsers className="w-4 h-4" />
+                                <span>{gId}모둠 ({gData.studentCount}명)</span>
+                                <span className="bg-indigo-800/20 px-2 py-0.5 rounded-full text-[10px]">{gData.total}회</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        <div className="bg-indigo-50/80 border border-indigo-100 p-4 rounded-2xl">
+                          <h5 className="text-xs font-bold text-indigo-900 mb-2.5 flex items-center space-x-1.5">
+                            <IconUsers className="w-4 h-4 text-indigo-600" />
+                            <span>{activeGroupFilter}모둠 소속 학생 명단 ({students.filter(s => s.groupId === activeGroupFilter).length}명)</span>
+                          </h5>
+                          <div className="flex flex-wrap gap-2">
+                            {students.filter(s => s.groupId === activeGroupFilter).length === 0 ? (
+                              <span className="text-xs text-indigo-400 font-medium italic">현재 이 모둠에 배치된 학생이 없습니다.</span>
+                            ) : (
+                              students.filter(s => s.groupId === activeGroupFilter).map(st => (
+                                <div key={st.id} className="bg-white border border-indigo-200 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-800 shadow-sm flex items-center space-x-2">
+                                  <IconUser className="w-3.5 h-3.5 text-indigo-500" />
+                                  <span>{st.studentNum} {st.name}</span>
+                                  <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md text-[11px] font-semibold border border-indigo-100">
+                                    {st.total}회 시행
+                                  </span>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
+
+                        {(() => {
+                          const activeGroupData = getGroupAggregate(activeGroupFilter);
+                          return (
+                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                              <div className="lg:col-span-7 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                                <h4 className="text-base font-bold text-slate-800 mb-1 flex items-center space-x-2">
+                                  <IconBarChart3 className="w-5 h-5 text-indigo-600" />
+                                  <span>{activeGroupFilter}모둠 상대도수 차트 (합계: {activeGroupData.total}회)</span>
+                                </h4>
+                                <p className="text-xs text-slate-500 mb-4">모둠원 데이터가 합산되어 시행 횟수가 늘어났습니다.</p>
+
+                                <div className="h-64 w-full">
+                                  {Recharts && (
+                                    <ResponsiveContainer width="100%" height="100%">
+                                      <BarChart data={activeGroupData.chartData}>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                        <XAxis dataKey="face" tick={{ fontSize: 12 }} />
+                                        <YAxis domain={[0, 0.40]} tick={{ fontSize: 12 }} />
+                                        <Tooltip formatter={(val) => [val, '상대도수']} />
+                                        <ReferenceLine y={0.167} stroke="#ef4444" strokeDasharray="4 4" strokeWidth={2} label={{ value: '1/6 (0.167)', fill: '#ef4444', fontSize: 11, position: 'top' }} />
+                                        <Bar dataKey="relativeFreq" fill="#4f46e5" radius={[6, 6, 0, 0]} />
+                                      </BarChart>
+                                    </ResponsiveContainer>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="lg:col-span-5 bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+                                <h4 className="text-base font-bold text-slate-800">모둠 통합 수치 표</h4>
+                                <div className="overflow-x-auto">
+                                  <table className="w-full text-center text-xs">
+                                    <thead>
+                                      <tr className="bg-slate-100 text-slate-600 font-bold">
+                                        <th className="py-2 px-2">눈</th>
+                                        <th className="py-2 px-2">합산 횟수</th>
+                                        <th className="py-2 px-2">상대도수</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                      {[1, 2, 3, 4, 5, 6].map(num => {
+                                        const count = activeGroupData.counts[num];
+                                        const rel = activeGroupData.total > 0 ? (count / activeGroupData.total).toFixed(3) : '0.000';
+                                        return (
+                                          <tr key={num}>
+                                            <td className="py-2 font-bold text-indigo-700">눈 {num}</td>
+                                            <td className="py-2 font-semibold">{count}회</td>
+                                            <td className="py-2 font-mono font-bold text-slate-800">{rel}</td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
+
+                    {selectedTeacherTab === 'aggregate' && (
+                      <div className="space-y-6">
+                        {(() => {
+                          const classData = getClassAggregate();
+                          return (
+                            <div className="space-y-6">
+                              <div className="bg-gradient-to-r from-indigo-900 to-indigo-700 text-white p-6 rounded-2xl shadow-lg flex flex-col md:flex-row items-center justify-between gap-4">
+                                <div>
+                                  <div className="inline-flex items-center space-x-1 px-3 py-1 bg-yellow-400 text-yellow-950 font-black rounded-full text-xs mb-2">
+                                    <IconSparkles className="w-3.5 h-3.5" />
+                                    <span>대수의 법칙 (Law of Large Numbers)</span>
+                                  </div>
+                                  <h3 className="text-2xl font-black">학급 전체 상대도수 수렴 현황</h3>
+                                  <p className="text-indigo-200 text-xs md:text-sm mt-1">
+                                    학급 학생 {classData.studentCount}명의 주사위 데이터가 누적되어 총 <span className="text-yellow-300 font-black underline">{classData.total}회</span>의 대규모 시행이 이루어졌습니다.
+                                  </p>
+                                </div>
+
+                                <div className="bg-white/10 backdrop-blur-md px-6 py-4 rounded-xl border border-white/20 text-center">
+                                  <span className="text-xs text-indigo-200 block">수학적 확률 (목표치)</span>
+                                  <span className="text-2xl font-black text-yellow-300">1/6 ≈ 0.167</span>
+                                </div>
+                              </div>
+
+                              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                                <h4 className="text-base font-bold text-slate-800 mb-1">학급 통합 상대도수 차트</h4>
+                                <p className="text-xs text-slate-500 mb-4">시행 횟수가 매우 커질 때 각 눈의 상대도수가 0.167 라인에 평탄하게 수렴하는 모습을 관찰할 수 있습니다.</p>
+
+                                <div className="h-72 w-full">
+                                  {Recharts && (
+                                    <ResponsiveContainer width="100%" height="100%">
+                                      <BarChart data={classData.chartData}>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                        <XAxis dataKey="face" tick={{ fontSize: 13, fontWeight: 'bold' }} />
+                                        <YAxis domain={[0, 0.40]} tick={{ fontSize: 12 }} />
+                                        <Tooltip formatter={(val) => [val, '학급 전체 상대도수']} />
+                                        <ReferenceLine y={0.167} stroke="#ef4444" strokeDasharray="4 4" strokeWidth={3} label={{ value: '1/6 기준선 (0.167)', fill: '#ef4444', fontSize: 12, position: 'top', fontWeight: 'bold' }} />
+                                        <Bar dataKey="relativeFreq" fill="#10b981" radius={[6, 6, 0, 0]} />
+                                      </BarChart>
+                                    </ResponsiveContainer>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="bg-emerald-50 border border-emerald-200 p-6 rounded-2xl">
+                                <h4 className="font-bold text-emerald-950 text-base mb-2 flex items-center space-x-2">
+                                  <IconCheckCircle2 className="w-5 h-5 text-emerald-600" />
+                                  <span>수업 마무리 발문 가이드</span>
+                                </h4>
+                                <ul className="space-y-2 text-xs md:text-sm text-emerald-900 font-medium list-disc list-inside">
+                                  <li>개인 실험(10~100회) 결과와 학급 전체({classData.total}회) 결과에서 나타나는 상대도수 그래프 모양의 차이점은 무엇인가요?</li>
+                                  <li>주사위를 무한히 많이 던진다면 각 눈이 나올 상대도수는 어떤 소수 값에 점점 가까워질까요?</li>
+                                </ul>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </main>
+            </div>
+          );
+        }
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>
