@@ -22,6 +22,8 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <!-- 멀티 디바이스 전세계 실시간 웹소켓 통신 라이브러리 -->
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans antialiased">
     <div id="root"></div>
@@ -322,62 +324,67 @@
           const [sortKey, setSortKey] = useState(null);
           const [sortOrder, setSortOrder] = useState('asc');
 
-          // --- 6.6: 클라우드(Firestore) 실시간 구독 및 데이터 동기화 ---
-          useEffect(() => {
-            let unsubStudents = () => {};
-            let unsubSettings = () => {};
+// --- 6.6: 멀티 디바이스 실시간 클라우드 통신 (MQTT WebSocket) ---
+const mqttClientRef = useRef(null);
 
-            if (db) {
-              try {
-                const studentsRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('students');
-                unsubStudents = studentsRef.onSnapshot((snapshot) => {
-                  const list = [];
-                  snapshot.forEach((doc) => {
-                    list.push({ id: doc.id, ...doc.data() });
-                  });
-                  setStudents(list);
-                  setIsConnected(true);
-                }, (err) => {
-                  console.log("Realtime sync active local mode");
-                  setIsConnected(window.navigator.onLine);
-                });
+useEffect(() => {
+  if (window.mqtt) {
+    // 전 세계 기기 연결용 무설치 무료 실시간 통신 서버 접속
+    const client = window.mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
+      clientId: 'dice_lab_user_' + Math.random().toString(16).substring(2, 9),
+      keepalive: 30
+    });
+    mqttClientRef.current = client;
 
-                const settingsRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('settings').doc('classSettings');
-                unsubSettings = settingsRef.onSnapshot((doc) => {
-                  if (doc.exists) {
-                    const data = doc.data();
-                    if (data.isActivityPaused !== undefined) setIsActivityPaused(data.isActivityPaused);
-                    if (data.groupCount !== undefined) setGroupCount(data.groupCount);
-                  }
-                }, (err) => console.log("Settings listener active"));
-              } catch(e) {
-                console.warn("Firestore subscription error:", e);
-              }
+    client.on('connect', () => {
+      setIsConnected(true);
+      // 학급 내 학생 데이터 및 교사 제어 명령 구독
+      client.subscribe('dice_math_lab_v1/students/+');
+      client.subscribe('dice_math_lab_v1/settings');
+    });
+
+    client.on('message', (topic, message) => {
+      try {
+        const payload = JSON.parse(message.toString());
+        
+        // 1. 다른 기기에서 학생 데이터가 들어올 때 교사/학생 화면 자동 업데이트
+        if (topic.startsWith('dice_math_lab_v1/students/')) {
+          setStudents(prev => {
+            if (payload.deleted) {
+              return prev.filter(s => s.id !== payload.id);
             }
-
-            if (localSyncChannel) {
-              localSyncChannel.onmessage = (event) => {
-                if (!db && event.data) {
-                  if (event.data.type === 'SYNC_STUDENTS') setStudents(event.data.students);
-                  if (event.data.type === 'SYNC_SETTINGS') {
-                    if (event.data.isActivityPaused !== undefined) setIsActivityPaused(event.data.isActivityPaused);
-                    if (event.data.groupCount !== undefined) setGroupCount(event.data.groupCount);
-                  }
-                }
-              };
+            const idx = prev.findIndex(s => s.id === payload.id);
+            if (idx >= 0) {
+              const updated = [...prev];
+              updated[idx] = { ...updated[idx], ...payload };
+              return updated;
             }
+            return [...prev, payload];
+          });
+        } 
+        // 2. 교사의 일시정지/모둠 변경 설정 동기화
+        else if (topic === 'dice_math_lab_v1/settings') {
+          if (payload.isActivityPaused !== undefined) setIsActivityPaused(payload.isActivityPaused);
+          if (payload.groupCount !== undefined) setGroupCount(payload.groupCount);
+        }
+      } catch(e) {}
+    });
 
-            return () => {
-              unsubStudents();
-              unsubSettings();
-            };
-          }, []);
+    client.on('offline', () => setIsConnected(false));
+    client.on('error', () => setIsConnected(false));
+  }
 
-          const broadcastLocalState = (type, payload) => {
-            if (!db && localSyncChannel) {
-              localSyncChannel.postMessage({ type, ...payload });
-            }
-          };
+  return () => {
+    if (mqttClientRef.current) mqttClientRef.current.end();
+  };
+}, []);
+
+// 데이터를 전 세계 모든 기기로 브로드캐스팅하는 방송 함수
+const broadcastData = (topic, payload) => {
+  if (mqttClientRef.current && mqttClientRef.current.connected) {
+    mqttClientRef.current.publish(topic, JSON.stringify(payload), { retain: true, qos: 0 });
+  }
+};
 
           // --- 6.7: 테이블 정렬 기능 ---
           const handleSort = (key) => {
@@ -434,10 +441,11 @@
                   await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('students').doc(newStudentId).set(newStudentData);
                 } catch(e) {}
               }
-              const updatedList = [...students, { id: newStudentId, ...newStudentData }];
-              setStudents(updatedList);
-              broadcastLocalState('SYNC_STUDENTS', { students: updatedList });
-              setCurrentStudentId(newStudentId);
+const updatedList = [...students, { id: newStudentId, ...newStudentData }];
+setStudents(updatedList);
+// 입장한 새 학생 정보를 교사 PC로 즉시 전송
+broadcastData(`dice_math_lab_v1/students/${newStudentId}`, { id: newStudentId, ...newStudentData });
+setCurrentStudentId(newStudentId);
             }
             setViewMode('student');
           };
@@ -488,13 +496,22 @@
                 } catch(e) {}
               }
 
-              setStudents(prev => {
-                const updated = prev.map(st => st.id === currentStudentId ? {
-                  ...st, counts: { ...currentCounts }, total: currentTotal, logs: [...currentLogs]
-                } : st);
-                broadcastLocalState('SYNC_STUDENTS', { students: updated });
-                return updated;
-              });
+setStudents(prev => {
+  return prev.map(st => st.id === currentStudentId ? {
+    ...st, counts: { ...currentCounts }, total: currentTotal, logs: [...currentLogs]
+  } : st);
+});
+
+// 전 세계 다른 기기(교사 PC)로 이 학생의 주사위 기록 실시간 전송
+broadcastData(`dice_math_lab_v1/students/${currentStudentId}`, {
+  id: currentStudentId,
+  studentNum: targetStudent ? targetStudent.studentNum : '',
+  name: targetStudent ? targetStudent.name : '',
+  groupId: targetStudent ? targetStudent.groupId : 1,
+  counts: currentCounts,
+  total: currentTotal,
+  logs: currentLogs
+});
 
               await new Promise(resolve => setTimeout(resolve, stepDelay));
             }
