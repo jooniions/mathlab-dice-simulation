@@ -280,6 +280,13 @@
         // SECTION 6: 메인 애플리케이션 컴포넌트 (App)
         // =========================================================================
         function App() {
+            const broadcastData = (topic, payload) => {
+  try {
+    if (mqttClientRef.current && mqttClientRef.current.connected) {
+      mqttClientRef.current.publish(topic, JSON.stringify(payload), { retain: true, qos: 0 });
+    }
+  } catch(err) {}
+};
           // --- 6.1: 화면 상태 및 로그인 관리 ---
           const [viewMode, setViewMode] = useState('login');
           const [loginType, setLoginType] = useState('student');
@@ -418,37 +425,43 @@ const broadcastData = (topic, payload) => {
           const currentStudent = useMemo(() => students.find(s => s.id === currentStudentId) || null, [students, currentStudentId]);
 
           // --- 6.8: 학생 로그인 및 생성 ---
-          const handleStudentLogin = async (e) => {
-            e.preventDefault();
-            if (!inputClass.trim() || !inputNumber.trim() || !inputName.trim()) return;
+const handleStudentLogin = async (e) => {
+  e.preventDefault();
+  if (!inputClass.trim() || !inputNumber.trim() || !inputName.trim()) return;
 
-            const formattedNum = `2학년 ${inputClass}반 ${inputNumber}번`;
-            const existing = students.find(s => s.studentNum === formattedNum);
-            if (existing) {
-              setCurrentStudentId(existing.id);
-            } else {
-              const newStudentId = Date.now().toString();
-              const newStudentData = {
-                studentNum: formattedNum,
-                name: inputName.trim(),
-                groupId: 1,
-                counts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
-                total: 0,
-                logs: []
-              };
-              if (db) {
-                try {
-                  await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('students').doc(newStudentId).set(newStudentData);
-                } catch(e) {}
-              }
-const updatedList = [...students, { id: newStudentId, ...newStudentData }];
-setStudents(updatedList);
-// 입장한 새 학생 정보를 교사 PC로 즉시 전송
-broadcastData(`dice_math_lab_v1/students/${newStudentId}`, { id: newStudentId, ...newStudentData });
-setCurrentStudentId(newStudentId);
-            }
-            setViewMode('student');
-          };
+  const formattedNum = `2학년 ${inputClass}반 ${inputNumber}번`;
+  const existing = students.find(s => s.studentNum === formattedNum);
+
+  if (existing) {
+    setCurrentStudentId(existing.id);
+  } else {
+    const newStudentId = Date.now().toString();
+    const newStudentData = {
+      studentNum: formattedNum,
+      name: inputName.trim(),
+      groupId: 1,
+      counts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
+      total: 0,
+      logs: []
+    };
+
+    const updatedList = [...students, { id: newStudentId, ...newStudentData }];
+    setStudents(updatedList);
+    setCurrentStudentId(newStudentId);
+
+    // 통신 오류가 발생해도 입장 및 화면 전환에 영향을 주지 않도록 예외 처리
+    try {
+      if (typeof broadcastData === 'function') {
+        broadcastData(`dice_math_lab_v1/students/${newStudentId}`, { id: newStudentId, ...newStudentData });
+      }
+    } catch(err) {
+      console.warn("실시간 통신 전송 대기 중:", err);
+    }
+  }
+
+  // 화면 전환을 무조건 실행
+  setViewMode('student');
+};
 
           const handleTeacherLogin = (e) => {
             e.preventDefault();
