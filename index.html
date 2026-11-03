@@ -594,16 +594,18 @@
                 <div className="p-2 bg-indigo-600 rounded-xl shadow-inner">
                   <IconDices className="w-6 h-6 text-yellow-300 animate-pulse" />
                 </div>
-                <div>
-                  <h1 className="font-extrabold text-lg leading-tight">확률의 도입 - 주사위 실험</h1>
-                  <p className="text-xs text-indigo-200 flex items-center space-x-1.5">
-                    <span>중2 수학 · Ⅵ-1-2 확률의 개념</span>
-                    <span className={`inline-block w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-400' : 'bg-amber-400'}`}></span>
-                    <span className={`text-[10px] font-semibold ${isConnected ? 'text-emerald-300' : 'text-amber-300'}`}>
-                      {isConnected ? '실시간 동기화 중' : '동기화 연결 안 됨'}
-                    </span>
-                  </p>
-                </div>
+                    <div>
+                      <h1 className="font-extrabold text-lg leading-tight">확률의 도입 - 주사위 실험</h1>
+                      <p className="text-xs text-indigo-200">
+                        중2 수학 · Ⅵ-1-2 확률의 개념
+                      </p>
+                      <div className="flex items-center space-x-1.5 mt-0.5">
+                        <span className={`inline-block w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-400' : 'bg-amber-400'}`}></span>
+                        <span className={`text-[10px] font-semibold ${isConnected ? 'text-emerald-300' : 'text-amber-300'}`}>
+                          {isConnected ? '실시간 동기화 중' : '동기화 연결 안 됨'}
+                        </span>
+                      </div>
+                    </div>
               </div>
 
               {/* [요청사항 1] 로그아웃 버튼 옆에 학번 이름 뜨게 하기 */}
