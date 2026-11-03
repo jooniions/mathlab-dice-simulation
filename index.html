@@ -280,13 +280,6 @@
         // SECTION 6: 메인 애플리케이션 컴포넌트 (App)
         // =========================================================================
         function App() {
-            const broadcastData = (topic, payload) => {
-  try {
-    if (mqttClientRef.current && mqttClientRef.current.connected) {
-      mqttClientRef.current.publish(topic, JSON.stringify(payload), { retain: true, qos: 0 });
-    }
-  } catch(err) {}
-};
           // --- 6.1: 화면 상태 및 로그인 관리 ---
           const [viewMode, setViewMode] = useState('login');
           const [loginType, setLoginType] = useState('student');
@@ -298,21 +291,8 @@
           const [inputName, setInputName] = useState('');
           const [currentStudentId, setCurrentStudentId] = useState(null);
 
-          // --- 6.2: 네트워크 동기화 상태 감지 [요구사항 1] ---
+          // --- 6.2: 네트워크 동기화 상태 감지 ---
           const [isConnected, setIsConnected] = useState(typeof window !== 'undefined' ? window.navigator.onLine : true);
-
-          useEffect(() => {
-            const handleOnline = () => setIsConnected(true);
-            const handleOffline = () => setIsConnected(false);
-
-            window.addEventListener('online', handleOnline);
-            window.addEventListener('offline', handleOffline);
-
-            return () => {
-              window.removeEventListener('online', handleOnline);
-              window.removeEventListener('offline', handleOffline);
-            };
-          }, []);
 
           // --- 6.3: 주사위 모션 및 상태 ---
           const [diceRotation, setDiceRotation] = useState({ x: 0, y: 0 });
@@ -331,67 +311,60 @@
           const [sortKey, setSortKey] = useState(null);
           const [sortOrder, setSortOrder] = useState('asc');
 
-// --- 6.6: 멀티 디바이스 실시간 클라우드 통신 (MQTT WebSocket) ---
-const mqttClientRef = useRef(null);
+          // --- 6.6: 멀티 디바이스 실시간 통신 (MQTT WebSocket) ---
+          const mqttClientRef = useRef(null);
 
-useEffect(() => {
-  if (window.mqtt) {
-    // 전 세계 기기 연결용 무설치 무료 실시간 통신 서버 접속
-    const client = window.mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
-      clientId: 'dice_lab_user_' + Math.random().toString(16).substring(2, 9),
-      keepalive: 30
-    });
-    mqttClientRef.current = client;
+          const broadcastData = (topic, payload) => {
+            try {
+              if (mqttClientRef.current && mqttClientRef.current.connected) {
+                mqttClientRef.current.publish(topic, JSON.stringify(payload), { retain: true, qos: 0 });
+              }
+            } catch(e) {}
+          };
 
-    client.on('connect', () => {
-      setIsConnected(true);
-      // 학급 내 학생 데이터 및 교사 제어 명령 구독
-      client.subscribe('dice_math_lab_v1/students/+');
-      client.subscribe('dice_math_lab_v1/settings');
-    });
+          useEffect(() => {
+            if (window.mqtt) {
+              const client = window.mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
+                clientId: 'dice_lab_user_' + Math.random().toString(16).substring(2, 9),
+                keepalive: 30
+              });
+              mqttClientRef.current = client;
 
-    client.on('message', (topic, message) => {
-      try {
-        const payload = JSON.parse(message.toString());
-        
-        // 1. 다른 기기에서 학생 데이터가 들어올 때 교사/학생 화면 자동 업데이트
-        if (topic.startsWith('dice_math_lab_v1/students/')) {
-          setStudents(prev => {
-            if (payload.deleted) {
-              return prev.filter(s => s.id !== payload.id);
+              client.on('connect', () => {
+                setIsConnected(true);
+                client.subscribe('dice_math_lab_v1/students/+');
+                client.subscribe('dice_math_lab_v1/settings');
+              });
+
+              client.on('message', (topic, message) => {
+                try {
+                  const payload = JSON.parse(message.toString());
+                  if (topic.startsWith('dice_math_lab_v1/students/')) {
+                    setStudents(prev => {
+                      if (payload.deleted) return prev.filter(s => s.id !== payload.id);
+                      const idx = prev.findIndex(s => s.id === payload.id);
+                      if (idx >= 0) {
+                        const updated = [...prev];
+                        updated[idx] = { ...updated[idx], ...payload };
+                        return updated;
+                      }
+                      return [...prev, payload];
+                    });
+                  } else if (topic === 'dice_math_lab_v1/settings') {
+                    if (payload.isActivityPaused !== undefined) setIsActivityPaused(payload.isActivityPaused);
+                    if (payload.groupCount !== undefined) setGroupCount(payload.groupCount);
+                  }
+                } catch(e) {}
+              });
+
+              client.on('offline', () => setIsConnected(false));
+              client.on('error', () => setIsConnected(false));
             }
-            const idx = prev.findIndex(s => s.id === payload.id);
-            if (idx >= 0) {
-              const updated = [...prev];
-              updated[idx] = { ...updated[idx], ...payload };
-              return updated;
-            }
-            return [...prev, payload];
-          });
-        } 
-        // 2. 교사의 일시정지/모둠 변경 설정 동기화
-        else if (topic === 'dice_math_lab_v1/settings') {
-          if (payload.isActivityPaused !== undefined) setIsActivityPaused(payload.isActivityPaused);
-          if (payload.groupCount !== undefined) setGroupCount(payload.groupCount);
-        }
-      } catch(e) {}
-    });
 
-    client.on('offline', () => setIsConnected(false));
-    client.on('error', () => setIsConnected(false));
-  }
-
-  return () => {
-    if (mqttClientRef.current) mqttClientRef.current.end();
-  };
-}, []);
-
-// 데이터를 전 세계 모든 기기로 브로드캐스팅하는 방송 함수
-const broadcastData = (topic, payload) => {
-  if (mqttClientRef.current && mqttClientRef.current.connected) {
-    mqttClientRef.current.publish(topic, JSON.stringify(payload), { retain: true, qos: 0 });
-  }
-};
+            return () => {
+              if (mqttClientRef.current) mqttClientRef.current.end();
+            };
+          }, []);
 
           // --- 6.7: 테이블 정렬 기능 ---
           const handleSort = (key) => {
@@ -425,43 +398,34 @@ const broadcastData = (topic, payload) => {
           const currentStudent = useMemo(() => students.find(s => s.id === currentStudentId) || null, [students, currentStudentId]);
 
           // --- 6.8: 학생 로그인 및 생성 ---
-const handleStudentLogin = async (e) => {
-  e.preventDefault();
-  if (!inputClass.trim() || !inputNumber.trim() || !inputName.trim()) return;
+          const handleStudentLogin = async (e) => {
+            e.preventDefault();
+            if (!inputClass.trim() || !inputNumber.trim() || !inputName.trim()) return;
 
-  const formattedNum = `2학년 ${inputClass}반 ${inputNumber}번`;
-  const existing = students.find(s => s.studentNum === formattedNum);
+            const formattedNum = `2학년 ${inputClass}반 ${inputNumber}번`;
+            const existing = students.find(s => s.studentNum === formattedNum);
 
-  if (existing) {
-    setCurrentStudentId(existing.id);
-  } else {
-    const newStudentId = Date.now().toString();
-    const newStudentData = {
-      studentNum: formattedNum,
-      name: inputName.trim(),
-      groupId: 1,
-      counts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
-      total: 0,
-      logs: []
-    };
+            if (existing) {
+              setCurrentStudentId(existing.id);
+            } else {
+              const newStudentId = Date.now().toString();
+              const newStudentData = {
+                studentNum: formattedNum,
+                name: inputName.trim(),
+                groupId: 1,
+                counts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
+                total: 0,
+                logs: []
+              };
 
-    const updatedList = [...students, { id: newStudentId, ...newStudentData }];
-    setStudents(updatedList);
-    setCurrentStudentId(newStudentId);
+              const updatedList = [...students, { id: newStudentId, ...newStudentData }];
+              setStudents(updatedList);
+              setCurrentStudentId(newStudentId);
 
-    // 통신 오류가 발생해도 입장 및 화면 전환에 영향을 주지 않도록 예외 처리
-    try {
-      if (typeof broadcastData === 'function') {
-        broadcastData(`dice_math_lab_v1/students/${newStudentId}`, { id: newStudentId, ...newStudentData });
-      }
-    } catch(err) {
-      console.warn("실시간 통신 전송 대기 중:", err);
-    }
-  }
-
-  // 화면 전환을 무조건 실행
-  setViewMode('student');
-};
+              broadcastData(`dice_math_lab_v1/students/${newStudentId}`, { id: newStudentId, ...newStudentData });
+            }
+            setViewMode('student');
+          };
 
           const handleTeacherLogin = (e) => {
             e.preventDefault();
@@ -499,32 +463,19 @@ const handleStudentLogin = async (e) => {
               const newLog = { id: Date.now() + Math.random(), round: currentTotal, value: result };
               currentLogs = [newLog, ...currentLogs].slice(0, 50);
 
-              if (db) {
-                try {
-                  db.collection('artifacts').doc(appId).collection('public').doc('data').collection('students').doc(currentStudentId).update({
-                    counts: currentCounts,
-                    total: currentTotal,
-                    logs: currentLogs
-                  });
-                } catch(e) {}
-              }
+              setStudents(prev => prev.map(st => st.id === currentStudentId ? {
+                ...st, counts: { ...currentCounts }, total: currentTotal, logs: [...currentLogs]
+              } : st));
 
-setStudents(prev => {
-  return prev.map(st => st.id === currentStudentId ? {
-    ...st, counts: { ...currentCounts }, total: currentTotal, logs: [...currentLogs]
-  } : st);
-});
-
-// 전 세계 다른 기기(교사 PC)로 이 학생의 주사위 기록 실시간 전송
-broadcastData(`dice_math_lab_v1/students/${currentStudentId}`, {
-  id: currentStudentId,
-  studentNum: targetStudent ? targetStudent.studentNum : '',
-  name: targetStudent ? targetStudent.name : '',
-  groupId: targetStudent ? targetStudent.groupId : 1,
-  counts: currentCounts,
-  total: currentTotal,
-  logs: currentLogs
-});
+              broadcastData(`dice_math_lab_v1/students/${currentStudentId}`, {
+                id: currentStudentId,
+                studentNum: targetStudent ? targetStudent.studentNum : '',
+                name: targetStudent ? targetStudent.name : '',
+                groupId: targetStudent ? targetStudent.groupId : 1,
+                counts: currentCounts,
+                total: currentTotal,
+                logs: currentLogs
+              });
 
               await new Promise(resolve => setTimeout(resolve, stepDelay));
             }
@@ -535,73 +486,40 @@ broadcastData(`dice_math_lab_v1/students/${currentStudentId}`, {
           const resetStudentData = () => {
             if (!currentStudentId) return;
             const resetData = { counts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }, total: 0, logs: [] };
-            if (db) {
-              try {
-                db.collection('artifacts').doc(appId).collection('public').doc('data').collection('students').doc(currentStudentId).update(resetData);
-              } catch(e) {}
-            }
-            setStudents(prev => {
-              const updated = prev.map(st => st.id === currentStudentId ? { ...st, ...resetData } : st);
-              broadcastLocalState('SYNC_STUDENTS', { students: updated });
-              return updated;
-            });
+            setStudents(prev => prev.map(st => st.id === currentStudentId ? { ...st, ...resetData } : st));
+            broadcastData(`dice_math_lab_v1/students/${currentStudentId}`, { id: currentStudentId, ...resetData });
           };
 
           const handleKickStudent = (studentId) => {
-            if (db) {
-              try {
-                db.collection('artifacts').doc(appId).collection('public').doc('data').collection('students').doc(studentId).delete();
-              } catch(e) {}
-            }
-            setStudents(prev => {
-              const updated = prev.filter(s => s.id !== studentId);
-              broadcastLocalState('SYNC_STUDENTS', { students: updated });
-              return updated;
-            });
+            setStudents(prev => prev.filter(s => s.id !== studentId));
+            broadcastData(`dice_math_lab_v1/students/${studentId}`, { id: studentId, deleted: true });
           };
 
           const handleGroupChange = (studentId, newGroupId) => {
-            if (db) {
-              try {
-                db.collection('artifacts').doc(appId).collection('public').doc('data').collection('students').doc(studentId).update({ groupId: Number(newGroupId) });
-              } catch(e) {}
+            setStudents(prev => prev.map(st => st.id === studentId ? { ...st, groupId: Number(newGroupId) } : st));
+            const st = students.find(s => s.id === studentId);
+            if (st) {
+              broadcastData(`dice_math_lab_v1/students/${studentId}`, { ...st, groupId: Number(newGroupId) });
             }
-            setStudents(prev => {
-              const updated = prev.map(st => st.id === studentId ? { ...st, groupId: Number(newGroupId) } : st);
-              broadcastLocalState('SYNC_STUDENTS', { students: updated });
-              return updated;
-            });
           };
 
           const handleAutoAssignGroups = () => {
-            if (db) {
-              students.forEach((st, idx) => {
-                try {
-                  db.collection('artifacts').doc(appId).collection('public').doc('data').collection('students').doc(st.id).update({ groupId: (idx % groupCount) + 1 });
-                } catch(e) {}
-              });
-            }
             setStudents(prev => {
-              const updated = prev.map((st, idx) => ({ ...st, groupId: (idx % groupCount) + 1 }));
-              broadcastLocalState('SYNC_STUDENTS', { students: updated });
+              const updated = prev.map((st, idx) => {
+                const assignedGroup = (idx % groupCount) + 1;
+                broadcastData(`dice_math_lab_v1/students/${st.id}`, { ...st, groupId: assignedGroup });
+                return { ...st, groupId: assignedGroup };
+              });
               return updated;
             });
           };
 
           const handleResetAllData = () => {
             const resetData = { counts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }, total: 0, logs: [] };
-            if (db) {
-              students.forEach(st => {
-                try {
-                  db.collection('artifacts').doc(appId).collection('public').doc('data').collection('students').doc(st.id).update(resetData);
-                } catch(e) {}
-              });
-            }
-            setStudents(prev => {
-              const updated = prev.map(st => ({ ...st, ...resetData }));
-              broadcastLocalState('SYNC_STUDENTS', { students: updated });
-              return updated;
-            });
+            setStudents(prev => prev.map(st => {
+              broadcastData(`dice_math_lab_v1/students/${st.id}`, { ...st, ...resetData });
+              return { ...st, ...resetData };
+            }));
           };
 
           // --- 6.10: 통계 수치 연산 ---
@@ -648,7 +566,6 @@ broadcastData(`dice_math_lab_v1/students/${currentStudentId}`, {
                 .-rotate-x-90 { transform: rotateX(-90deg) translateZ(48px); }
               `}</style>
 
-              {/* 공통 상단 헤더: 실시간 동기화 상태 감지 반영 [요구사항 1] */}
               <header className="bg-indigo-700 text-white shadow-md sticky top-0 z-50">
                 <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
                   <div className="flex items-center space-x-3">
@@ -682,7 +599,6 @@ broadcastData(`dice_math_lab_v1/students/${currentStudentId}`, {
               </header>
 
               <main className="max-w-7xl mx-auto p-4 sm:p-6">
-                {/* 1. 로그인 접속 화면 */}
                 {viewMode === 'login' && (
                   <div className="flex flex-col items-center justify-between min-h-[calc(100vh-140px)] py-4">
                     <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden my-auto">
@@ -765,7 +681,6 @@ broadcastData(`dice_math_lab_v1/students/${currentStudentId}`, {
                   </div>
                 )}
 
-                {/* 2. 학생 실험실 화면 */}
                 {viewMode === 'student' && currentStudent && (
                   <div className="space-y-6">
                     {isActivityPaused && (
@@ -894,7 +809,6 @@ broadcastData(`dice_math_lab_v1/students/${currentStudentId}`, {
                   </div>
                 )}
 
-                {/* 3. 교사 대시보드 화면 */}
                 {viewMode === 'teacher' && (
                   <div className="space-y-6">
                     <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -913,8 +827,7 @@ broadcastData(`dice_math_lab_v1/students/${currentStudentId}`, {
                         <button onClick={() => { 
                           const nextPause = !isActivityPaused;
                           setIsActivityPaused(nextPause);
-                          if (db) try { db.collection('artifacts').doc(appId).collection('public').doc('data').collection('settings').doc('classSettings').set({ isActivityPaused: nextPause }, { merge: true }); } catch(e){}
-                          broadcastLocalState('SYNC_SETTINGS', { isActivityPaused: nextPause });
+                          broadcastData('dice_math_lab_v1/settings', { isActivityPaused: nextPause });
                         }} className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center space-x-1 shadow-sm ${isActivityPaused ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-amber-500 text-white hover:bg-amber-600'}`}>
                           <IconShieldAlert className="w-4 h-4" />
                           <span>{isActivityPaused ? '학생 활동 재개' : '학생 활동 일시정지'}</span>
@@ -941,7 +854,6 @@ broadcastData(`dice_math_lab_v1/students/${currentStudentId}`, {
                       </button>
                     </div>
 
-                    {/* 3.1: 참여 학생 관리 탭 */}
                     {selectedTeacherTab === 'overview' && (
                       <div className="space-y-6">
                         <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row items-center justify-between gap-4">
@@ -959,8 +871,7 @@ broadcastData(`dice_math_lab_v1/students/${currentStudentId}`, {
                               <select value={groupCount} onChange={(e) => { 
                                 const cnt = Number(e.target.value); 
                                 setGroupCount(cnt); 
-                                if (db) try { db.collection('artifacts').doc(appId).collection('public').doc('data').collection('settings').doc('classSettings').set({ groupCount: cnt }, { merge: true }); } catch(e){}
-                                broadcastLocalState('SYNC_SETTINGS', { groupCount: cnt });
+                                broadcastData('dice_math_lab_v1/settings', { groupCount: cnt });
                               }} className="px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500">
                                 {[2, 3, 4, 5, 6, 7, 8].map(n => <option key={n} value={n}>{n}개 모둠</option>)}
                               </select>
@@ -1023,7 +934,6 @@ broadcastData(`dice_math_lab_v1/students/${currentStudentId}`, {
                       </div>
                     )}
 
-                    {/* 3.2: 모둠별 실험 결과 탭 */}
                     {selectedTeacherTab === 'groups' && (
                       <div className="space-y-6">
                         <div className="flex space-x-2 overflow-x-auto pb-1">
@@ -1113,7 +1023,6 @@ broadcastData(`dice_math_lab_v1/students/${currentStudentId}`, {
                       </div>
                     )}
 
-                    {/* 3.3: 학급 전체 실험 결과 탭 */}
                     {selectedTeacherTab === 'aggregate' && (
                       <div className="space-y-6">
                         {(() => {
