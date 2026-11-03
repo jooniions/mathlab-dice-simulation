@@ -11,7 +11,7 @@
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- React & ReactDOM (cdnjs) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script><span className={`inline-block w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-400' : 'bg-amber-400'}`}></span>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <!-- Babel Standalone -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
@@ -243,21 +243,22 @@
         }
 
         function Dice3D({ rotation, transitionSpeed }) {
-          const durationClass = transitionSpeed === 'fast' ? 'duration-200' : 'duration-500';
-          // rounded-2xl 및 overflow-hidden을 각각의 면 감싸는 div에 적용하여 사각형 직각 모서리가 밖으로 튀어나오는 현상을 완전히 제거
-          return (
-            <div className="w-32 h-32 my-6 perspective-800 flex items-center justify-center">
-              <div className={`w-24 h-24 relative transform-style-3d transition-transform ${durationClass} ease-out`} style={{ transform: `rotateX(${rotation.x}deg) rotateY(${rotation.y}deg)` }}>
-                <div className="absolute w-24 h-24 translate-z-12 rounded-2xl overflow-hidden bg-white"><DiceFace number={1} /></div>
-                <div className="absolute w-24 h-24 rotate-y-180 translate-z-12 rounded-2xl overflow-hidden bg-white"><DiceFace number={6} /></div>
-                <div className="absolute w-24 h-24 rotate-y-90 translate-z-12 rounded-2xl overflow-hidden bg-white"><DiceFace number={2} /></div>
-                <div className="absolute w-24 h-24 -rotate-y-90 translate-z-12 rounded-2xl overflow-hidden bg-white"><DiceFace number={5} /></div>
-                <div className="absolute w-24 h-24 rotate-x-90 translate-z-12 rounded-2xl overflow-hidden bg-white"><DiceFace number={3} /></div>
-                <div className="absolute w-24 h-24 -rotate-x-90 translate-z-12 rounded-2xl overflow-hidden bg-white"><DiceFace number={4} /></div>
-              </div>
-            </div>
-          );
-        }
+  const durationClass = transitionSpeed === 'fast' ? 'duration-200' : 'duration-500';
+  const faceStyle = { backfaceVisibility: 'hidden' };
+
+  return (
+    <div className="w-32 h-32 my-6 perspective-800 flex items-center justify-center">
+      <div className={`w-24 h-24 relative transform-style-3d transition-transform ${durationClass} ease-out`} style={{ transform: `rotateX(${rotation.x}deg) rotateY(${rotation.y}deg)` }}>
+        <div className="absolute w-24 h-24 translate-z-12" style={faceStyle}><DiceFace number={1} /></div>
+        <div className="absolute w-24 h-24 rotate-y-180 translate-z-12" style={faceStyle}><DiceFace number={6} /></div>
+        <div className="absolute w-24 h-24 rotate-y-90 translate-z-12" style={faceStyle}><DiceFace number={2} /></div>
+        <div className="absolute w-24 h-24 -rotate-y-90 translate-z-12" style={faceStyle}><DiceFace number={5} /></div>
+        <div className="absolute w-24 h-24 rotate-x-90 translate-z-12" style={faceStyle}><DiceFace number={3} /></div>
+        <div className="absolute w-24 h-24 -rotate-x-90 translate-z-12" style={faceStyle}><DiceFace number={4} /></div>
+      </div>
+    </div>
+  );
+}
 
         const getNextRotation = (currentRot, targetValue, isFast) => {
           const baseAngles = { 1: { x: 0, y: 0 }, 2: { x: 0, y: -90 }, 3: { x: -90, y: 0 }, 4: { x: 90, y: 0 }, 5: { x: 0, y: 90 }, 6: { x: 0, y: 180 } };
@@ -628,7 +629,7 @@
                       <h1 className="font-extrabold text-lg leading-tight">확률의 도입 - 주사위 실험</h1>
                       <p className="text-xs text-indigo-200 flex items-center space-x-1.5">
                         <span>중2 수학 · Ⅵ-1-2 확률의 개념</span>
-                        <span className={`inline-block w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-400 animate-ping' : 'bg-amber-400'}`}></span>
+                        <span className={`inline-block w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-400' : 'bg-amber-400'}`}></span>
                         <span className={`text-[10px] font-semibold ${isConnected ? 'text-emerald-300' : 'text-amber-300'}`}>
                           {isConnected ? '실시간 동기화 중' : '동기화 연결 안 됨'}
                         </span>
