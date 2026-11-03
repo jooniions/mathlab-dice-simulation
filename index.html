@@ -283,14 +283,16 @@
           // --- 6.1: 화면 상태 및 로그인 관리 ---
           const [viewMode, setViewMode] = useState('login');
           const [loginType, setLoginType] = useState('student');
-          const [teacherPass, setTeacherPass] = useState('');
+const [inputRoomCode, setInputRoomCode] = useState(''); // 학생용 수업코드 입력값
+const [teacherRoomCode, setTeacherRoomCode] = useState(''); // 교사용 수업코드 입력값
+const [teacherPass, setTeacherPass] = useState(''); // 교사 비밀번호 입력값
+const [roomCode, setRoomCode] = useState(''); // 현재 확정된 수업 세션 코드
           const [teacherAuthError, setTeacherAuthError] = useState(false);
 
           const [inputClass, setInputClass] = useState('');
           const [inputNumber, setInputNumber] = useState('');
           const [inputName, setInputName] = useState('');
           const [currentStudentId, setCurrentStudentId] = useState(null);
-            const [roomCode, setRoomCode] = useState('1234');
 
           // --- 6.2: 네트워크 동기화 상태 감지 ---
           const [isConnected, setIsConnected] = useState(typeof window !== 'undefined' ? window.navigator.onLine : true);
@@ -315,7 +317,39 @@
           // --- 6.6: 멀티 디바이스 실시간 통신 (MQTT WebSocket) ---
           const mqttClientRef = useRef(null);
 
-const broadcastData = (subTopic, payload) => {
+const broadcastData = (subTopic, payload) => {<form onSubmit={handleTeacherLogin} className="space-y-4">
+    <div>
+      <label className="block text-xs font-bold text-slate-600 mb-1">수업 코드 (세션 생성 및 접속)</label>
+      <input 
+        type="text" 
+        placeholder="예: math201 또는 1001" 
+        value={teacherRoomCode} 
+        onChange={(e) => setTeacherRoomCode(e.target.value)} 
+        required 
+        className="w-full px-4 py-2.5 rounded-xl border border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 text-sm font-bold bg-indigo-50/50" 
+      />
+    </div>
+    <div>
+      <label className="block text-xs font-bold text-slate-600 mb-1">교사 비밀번호</label>
+      <div className="relative">
+        <input 
+          type="password" 
+          placeholder="비밀번호 입력" 
+          value={teacherPass} 
+          onChange={(e) => setTeacherPass(e.target.value)} 
+          required 
+          className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 text-sm" 
+        />
+        <IconLock className="w-4 h-4 text-slate-400 absolute right-3 top-3" />
+      </div>
+      {teacherAuthError && <p className="text-xs text-rose-500 mt-1">비밀번호가 올바르지 않습니다.</p>}
+    </div>
+    <button type="submit" className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg shadow-emerald-200 transition-all text-sm flex items-center justify-center space-x-2">
+      <IconGraduationCap className="w-5 h-5" />
+      <span>수업 세션 개설 / 대시보드 입장</span>
+    </button>
+  </form>
+)}
   try {
     if (mqttClientRef.current && mqttClientRef.current.connected && roomCode) {
       const senderId = mqttClientRef.current.options?.clientId;
@@ -326,54 +360,52 @@ const broadcastData = (subTopic, payload) => {
   } catch(e) {}
 };
 
-          useEffect(() => {
-            if (window.mqtt) {
-              const client = window.mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
-                clientId: 'dice_lab_user_' + Math.random().toString(16).substring(2, 9),
-                keepalive: 30
-              });
-              mqttClientRef.current = client;
+useEffect(() => {
+  // 수업 코드가 입력되어 세션이 시작되었을 때만 웹소켓 통신 연결
+  if (!window.mqtt || !roomCode) return;
 
-              client.on('connect', () => {
-                setIsConnected(true);
-if (roomCode) {
-  client.subscribe(`dice_math_lab_v1/${roomCode}/students/+`);
-  client.subscribe(`dice_math_lab_v1/${roomCode}/settings`);
-}
-              });
+  setStudents([]); // 새 방에 들어왔으므로 이전 화면 데이터 초기화
 
-client.on('message', (topic, message) => {
-  try {
-    const payload = JSON.parse(message.toString());
-    // 내가 보낸 데이터가 서버를 거쳐 되돌아온 경우 내 화면 덮어쓰기 방지
-    if (payload.senderId && payload.senderId === mqttClientRef.current?.options?.clientId) return;
+  const client = window.mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
+    clientId: 'dice_lab_user_' + Math.random().toString(16).substring(2, 9),
+    keepalive: 30
+  });
+  mqttClientRef.current = client;
 
-if (topic.startsWith(`dice_math_lab_v1/${roomCode}/students/`)) {
-      setStudents(prev => {
-                      if (payload.deleted) return prev.filter(s => s.id !== payload.id);
-                      const idx = prev.findIndex(s => s.id === payload.id);
-                      if (idx >= 0) {
-                        const updated = [...prev];
-                        updated[idx] = { ...updated[idx], ...payload };
-                        return updated;
-                      }
-                      return [...prev, payload];
-                    });
-                  } else if (topic === 'dice_math_lab_v1/settings') {
-                    if (payload.isActivityPaused !== undefined) setIsActivityPaused(payload.isActivityPaused);
-                    if (payload.groupCount !== undefined) setGroupCount(payload.groupCount);
-                  }
-                } catch(e) {}
-              });
+  client.on('connect', () => {
+    setIsConnected(true);
+    // 로그인할 때 정한 수업 코드(roomCode) 전용 채널 구독
+    client.subscribe(`dice_math_lab_v1/${roomCode}/students/+`);
+    client.subscribe(`dice_math_lab_v1/${roomCode}/settings`);
+  });
 
-              client.on('offline', () => setIsConnected(false));
-              client.on('error', () => setIsConnected(false));
-            }
+  client.on('message', (topic, message) => {
+    try {
+      const payload = JSON.parse(message.toString());
+      if (payload.senderId && payload.senderId === mqttClientRef.current?.options?.clientId) return;
 
-            return () => {
-              if (mqttClientRef.current) mqttClientRef.current.end();
-            };
-          }, []);
+      if (topic.startsWith(`dice_math_lab_v1/${roomCode}/students/`)) {
+        setStudents(prev => {
+          if (payload.deleted) return prev.filter(s => s.id !== payload.id);
+          const idx = prev.findIndex(s => s.id === payload.id);
+          if (idx >= 0) {
+            const updated = [...prev];
+            updated[idx] = { ...updated[idx], ...payload };
+            return updated;
+          }
+          return [...prev, payload];
+        });
+      } else if (topic === `dice_math_lab_v1/${roomCode}/settings`) {
+        if (payload.isActivityPaused !== undefined) setIsActivityPaused(payload.isActivityPaused);
+        if (payload.groupCount !== undefined) setGroupCount(payload.groupCount);
+      }
+    } catch(e) {}
+  });
+
+  return () => {
+    if (client) client.end();
+  };
+}, [roomCode]); // roomCode가 입력/변경되면 즉시 채널 재연결
 
           // --- 6.7: 테이블 정렬 기능 ---
           const handleSort = (key) => {
@@ -407,46 +439,54 @@ if (topic.startsWith(`dice_math_lab_v1/${roomCode}/students/`)) {
           const currentStudent = useMemo(() => students.find(s => s.id === currentStudentId) || null, [students, currentStudentId]);
 
           // --- 6.8: 학생 로그인 및 생성 ---
-          const handleStudentLogin = async (e) => {
-            e.preventDefault();
-            if (!inputClass.trim() || !inputNumber.trim() || !inputName.trim()) return;
+const handleStudentLogin = async (e) => {
+  e.preventDefault();
+  if (!inputClass.trim() || !inputNumber.trim() || !inputName.trim() || !inputRoomCode.trim()) {
+    alert("반, 번호, 이름, 수업 코드를 모두 입력해 주세요.");
+    return;
+  }
 
-            const formattedNum = `2학년 ${inputClass}반 ${inputNumber}번`;
-            const existing = students.find(s => s.studentNum === formattedNum);
+  const selectedCode = inputRoomCode.trim();
+  setRoomCode(selectedCode); // 입력한 수업 코드로 세션 지정
 
-            if (existing) {
-              setCurrentStudentId(existing.id);
-            } else {
-              const newStudentId = Date.now().toString();
-              const newStudentData = {
-                studentNum: formattedNum,
-                name: inputName.trim(),
-                groupId: 1,
-                counts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
-                total: 0,
-                logs: []
-              };
+  const formattedNum = `2학년 ${inputClass}반 ${inputNumber}번`;
+  const existing = students.find(s => s.studentNum === formattedNum);
 
-              const updatedList = [...students, { id: newStudentId, ...newStudentData }];
-              setStudents(updatedList);
-              setCurrentStudentId(newStudentId);
+  if (existing) {
+    setCurrentStudentId(existing.id);
+  } else {
+    const newStudentId = Date.now().toString();
+    const newStudentData = {
+      studentNum: formattedNum,
+      name: inputName.trim(),
+      groupId: 1,
+      counts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
+      total: 0,
+      logs: []
+    };
 
-              broadcastData(`dice_math_lab_v1/students/${newStudentId}`, { id: newStudentId, ...newStudentData });
-            }
-            setViewMode('student');
-          };
+    const updatedList = [...students, { id: newStudentId, ...newStudentData }];
+    setStudents(updatedList);
+    setCurrentStudentId(newStudentId);
 
-          const handleTeacherLogin = (e) => {
-            e.preventDefault();
-            if (teacherPass === '1129') {
-              setTeacherAuthError(false);
-              setViewMode('teacher');
-              setTeacherPass('');
-            } else {
-              setTeacherAuthError(true);
-            }
-          };
+    broadcastData(`students/${newStudentId}`, { id: newStudentId, ...newStudentData });
+  }
 
+  setViewMode('student');
+};
+
+const handleTeacherLogin = (e) => {
+  e.preventDefault();
+  if (!teacherRoomCode.trim() || !teacherPass.trim()) {
+    alert("수업 코드와 비밀번호를 모두 입력해 주세요.");
+    return;
+  }
+
+  const selectedCode = teacherRoomCode.trim();
+  setRoomCode(selectedCode); // 교사가 생성/접속할 수업 코드로 세션 지정
+  setTeacherAuthError(false);
+  setViewMode('teacher');
+};
           // --- 6.9: 주사위 던지기 핵심 로직 ---
           const startDiceRoll = async (count) => {
             if (!currentStudentId || isActivityPaused || isRolling) return;
@@ -632,16 +672,8 @@ if (topic.startsWith(`dice_math_lab_v1/${roomCode}/students/`)) {
                         {loginType === 'student' ? (
                           <form onSubmit={handleStudentLogin} className="space-y-4">
 <div>
-  <label className="block text-xs font-bold text-slate-600 mb-1">수업 입장 코드 (4자리)</label>
-  <input 
-    type="text" 
-    placeholder="선생님이 안내한 4자리 코드 (예: 1234)" 
-    value={roomCode} 
-    onChange={(e) => setRoomCode(e.target.value.trim())} 
-    required 
-    maxLength={6}
-    className="w-full px-4 py-2.5 rounded-xl border border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 text-sm font-bold bg-indigo-50/50" 
-  />
+  <label className="block text-xs font-bold text-slate-600 mb-1">수업 코드</label>
+  <input type="text" placeholder="선생님이 안내한 수업 코드 (예: math201)" value={inputRoomCode} onChange={(e) => setInputRoomCode(e.target.value)} required className="w-full px-4 py-2.5 rounded-xl border border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 text-sm font-bold bg-indigo-50/50" />
 </div>
                             <div>
                               <label className="block text-xs font-bold text-slate-600 mb-1">학년</label>
@@ -832,11 +864,15 @@ if (topic.startsWith(`dice_math_lab_v1/${roomCode}/students/`)) {
 
                 {viewMode === 'teacher' && (
                   <div className="space-y-6">
-<div className="bg-indigo-900 text-white p-4 rounded-2xl flex items-center justify-between shadow-inner mb-4">
-  <div>
-    <span className="text-xs text-indigo-300 font-semibold block">학생들에게 안내할 수업 입장 코드</span>
-    <span className="text-3xl font-black tracking-wider text-yellow-300">{roomCode || '미설정'}</span>
-  </div>
+<div className="bg-indigo-900 text-white p-5 rounded-2xl flex flex-col sm:flex-row items-center justify-between shadow-lg gap-4">
+      <div>
+        <span className="text-xs text-indigo-200 font-semibold block">학생들에게 안내할 수업 코드</span>
+        <span className="text-3xl font-black text-yellow-300 tracking-wider">{roomCode}</span>
+      </div>
+      <div className="text-xs text-indigo-200 text-right">
+        <span>현재 세션에 접속한 학생들의 데이터만 실시간 집계됩니다.</span>
+      </div>
+    </div>
   <div className="flex space-x-2">
     <button 
       onClick={() => {
