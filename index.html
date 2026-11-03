@@ -5,72 +5,29 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>확률의 도입 - 주사위 실험</title>
     <script>
-        // 독립 실행 환경(UMD 빌드)에서 process 미정의 에러 방지를 위한 폴리필
         window.process = window.process || { env: { NODE_ENV: 'production' } };
     </script>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- React & ReactDOM (cdnjs) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script><span className={`inline-block w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-400' : 'bg-amber-400'}`}></span>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <!-- Babel Standalone -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
     <!-- Recharts 종속성 및 라이브러리 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prop-types/15.8.1/prop-types.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/recharts@2.12.7/umd/Recharts.min.js"></script>
-    <!-- Firebase Compat 라이브러리 -->
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
-    <!-- 멀티 디바이스 전세계 실시간 웹소켓 통신 라이브러리 -->
-<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <!-- MQTT 전세계 멀티 디바이스 실시간 통신 라이브러리 -->
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans antialiased">
     <div id="root"></div>
 
     <script type="text/babel">
-        // =========================================================================
-        // SECTION 1: 전역 설정 및 Firebase 클라우드 실시간 동기화 초기화
-        // =========================================================================
         const { useState, useEffect, useRef, useMemo } = React;
 
-        // Firebase 설정 수집 및 앱 식별자 정의
-        const appId = window.__app_id || 'dice-math-lab-v1';
-        const firebaseConfig = window.__firebase_config 
-          ? (typeof window.__firebase_config === 'string' ? JSON.parse(window.__firebase_config) : window.__firebase_config)
-          : { 
-              apiKey: "AIzaSyDemoConfigForTestingWithoutKey", 
-              authDomain: "demo-app.firebaseapp.com", 
-              projectId: "demo-app", 
-              storageBucket: "demo-app.appspot.com", 
-              messagingSenderId: "123456789", 
-              appId: "1:123456789:web:abcdef" 
-            };
-
-        let db = null;
-        let auth = null;
-
-        // Firebase Firestore 실시간 데이터베이스 안전 초기화
-        if (window.firebase) {
-          try {
-            if (!firebase.apps.length) {
-              firebase.initializeApp(firebaseConfig);
-            }
-            auth = firebase.auth();
-            db = firebase.firestore();
-            auth.signInAnonymously().catch((err) => console.log("Firebase Auth optional fallback active"));
-          } catch(e) {
-            console.warn("Firebase Init Fallback:", e);
-          }
-        }
-
-        // 오프라인/동일 기기 다른 탭간 실시간 보완 동기화 채널
-        const localSyncChannel = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('dice_math_lab_local_sync') : null;
-
-
         // =========================================================================
-        // SECTION 2: 차트 컴포넌트 (Recharts 연동 및 SVG Fallback 차트)
-        // [요구사항 2] 점선(ReferenceLine)이 막대 그래프 레이어 위에 오도록 Bar 뒤로 배치
+        // SECTION 1: 차트 컴포넌트 (Recharts 연동 및 SVG Fallback 차트)
         // =========================================================================
         const SafeChart = ({ data, height = 250, barColor = "#6366f1", targetVal = 0.167 }) => {
           if (window.Recharts && window.Recharts.BarChart) {
@@ -87,14 +44,12 @@
                       <Cell key={`cell-${index}`} fill={entry.relativeFreq === 0 ? '#cbd5e1' : barColor} />
                     ))}
                   </Bar>
-                  {/* ReferenceLine을 Bar 뒤로 이동시켜 막대 그래프 레이어 위에 점선이 오도록 설정 */}
                   <ReferenceLine y={targetVal} stroke="#ef4444" strokeDasharray="4 4" strokeWidth={2} label={{ value: `1/6 (${targetVal})`, fill: '#ef4444', fontSize: 11, position: 'top' }} />
                 </BarChart>
               </ResponsiveContainer>
             );
           }
 
-          // Recharts 차트 스크립트 미로드/차단 시 순수 SVG Fallback 차트 렌더링
           const maxVal = 0.40;
           return (
             <div className="w-full flex flex-col justify-end items-center relative pt-6 bg-slate-50/50 rounded-xl p-4 border border-slate-100" style={{ height }}>
@@ -129,9 +84,8 @@
           );
         };
 
-
         // =========================================================================
-        // SECTION 3: SVG 아이콘 컴포넌트 모음
+        // SECTION 2: SVG 아이콘 컴포넌트 모음
         // =========================================================================
         const IconBase = ({ children, className = "w-4 h-4", ...props }) => (
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
@@ -161,18 +115,14 @@
         const IconArrowUp = (p) => <IconBase {...p}><line x1="12" y1="19" x2="12" y2="5" /><polyline points="5 12 12 5 19 12" /></IconBase>;
         const IconArrowDown = (p) => <IconBase {...p}><line x1="12" y1="5" x2="12" y2="19" /><polyline points="19 12 12 19 5 12" /></IconBase>;
 
-
         // =========================================================================
-        // SECTION 4: Audio API 기반 주사위 효과음 합성
+        // SECTION 3: Audio API 기반 주사위 효과음
         // =========================================================================
         let sharedAudioCtx = null;
-
         const getAudioContext = () => {
           if (!sharedAudioCtx) {
             const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
-            if (AudioCtxClass) {
-              sharedAudioCtx = new AudioCtxClass();
-            }
+            if (AudioCtxClass) sharedAudioCtx = new AudioCtxClass();
           }
           if (sharedAudioCtx && sharedAudioCtx.state === 'suspended') {
             sharedAudioCtx.resume().catch(() => {});
@@ -198,12 +148,10 @@
           try {
             const ctx = getAudioContext();
             if (!ctx) return;
-
             const hits = isFast ? 2 : 4;
             for (let i = 0; i < hits; i++) {
               const delay = isFast ? i * 0.04 : i * 0.07 + Math.random() * 0.02;
               const startTime = ctx.currentTime + delay;
-
               const glassOsc = ctx.createOscillator();
               const glassGain = ctx.createGain();
               const baseFreq = 1200 + Math.random() * 600;
@@ -212,7 +160,6 @@
               glassOsc.type = 'sine';
               glassOsc.frequency.setValueAtTime(baseFreq, startTime);
               glassOsc.frequency.exponentialRampToValueAtTime(baseFreq * 0.85, startTime + duration);
-
               glassGain.gain.setValueAtTime(isFast ? 0.12 : 0.18, startTime);
               glassGain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
 
@@ -224,10 +171,8 @@
           } catch (e) {}
         };
 
-
         // =========================================================================
-        // SECTION 5: 3D 주사위 그래픽 컴포넌트 (DiceFace & Dice3D)
-        // [요구사항 3] 주사위 가장자리 모서리 튀어나옴(어색한 귀퉁이) 깔끔하게 보완
+        // SECTION 4: 3D 주사위 그래픽 컴포넌트
         // =========================================================================
         function DiceFace({ number }) {
           const getDots = () => {
@@ -245,22 +190,22 @@
         }
 
         function Dice3D({ rotation, transitionSpeed }) {
-  const durationClass = transitionSpeed === 'fast' ? 'duration-200' : 'duration-500';
-  const faceStyle = { backfaceVisibility: 'hidden' };
+          const durationClass = transitionSpeed === 'fast' ? 'duration-200' : 'duration-500';
+          const faceStyle = { backfaceVisibility: 'hidden' };
 
-  return (
-    <div className="w-32 h-32 my-6 perspective-800 flex items-center justify-center">
-      <div className={`w-24 h-24 relative transform-style-3d transition-transform ${durationClass} ease-out`} style={{ transform: `rotateX(${rotation.x}deg) rotateY(${rotation.y}deg)` }}>
-        <div className="absolute w-24 h-24 translate-z-12" style={faceStyle}><DiceFace number={1} /></div>
-        <div className="absolute w-24 h-24 rotate-y-180 translate-z-12" style={faceStyle}><DiceFace number={6} /></div>
-        <div className="absolute w-24 h-24 rotate-y-90 translate-z-12" style={faceStyle}><DiceFace number={2} /></div>
-        <div className="absolute w-24 h-24 -rotate-y-90 translate-z-12" style={faceStyle}><DiceFace number={5} /></div>
-        <div className="absolute w-24 h-24 rotate-x-90 translate-z-12" style={faceStyle}><DiceFace number={3} /></div>
-        <div className="absolute w-24 h-24 -rotate-x-90 translate-z-12" style={faceStyle}><DiceFace number={4} /></div>
-      </div>
-    </div>
-  );
-}
+          return (
+            <div className="w-32 h-32 my-6 perspective-800 flex items-center justify-center">
+              <div className={`w-24 h-24 relative transform-style-3d transition-transform ${durationClass} ease-out`} style={{ transform: `rotateX(${rotation.x}deg) rotateY(${rotation.y}deg)` }}>
+                <div className="absolute w-24 h-24 translate-z-12" style={faceStyle}><DiceFace number={1} /></div>
+                <div className="absolute w-24 h-24 rotate-y-180 translate-z-12" style={faceStyle}><DiceFace number={6} /></div>
+                <div className="absolute w-24 h-24 rotate-y-90 translate-z-12" style={faceStyle}><DiceFace number={2} /></div>
+                <div className="absolute w-24 h-24 -rotate-y-90 translate-z-12" style={faceStyle}><DiceFace number={5} /></div>
+                <div className="absolute w-24 h-24 rotate-x-90 translate-z-12" style={faceStyle}><DiceFace number={3} /></div>
+                <div className="absolute w-24 h-24 -rotate-x-90 translate-z-12" style={faceStyle}><DiceFace number={4} /></div>
+              </div>
+            </div>
+          );
+        }
 
         const getNextRotation = (currentRot, targetValue, isFast) => {
           const baseAngles = { 1: { x: 0, y: 0 }, 2: { x: 0, y: -90 }, 3: { x: -90, y: 0 }, 4: { x: 90, y: 0 }, 5: { x: 0, y: 90 }, 6: { x: 0, y: 180 } };
@@ -275,18 +220,18 @@
           return { x: getNextAngle(currentRot.x, target.x), y: getNextAngle(currentRot.y, target.y) };
         };
 
-
         // =========================================================================
-        // SECTION 6: 메인 애플리케이션 컴포넌트 (App)
+        // SECTION 5: 메인 애플리케이션 컴포넌트 (App)
         // =========================================================================
         function App() {
-          // --- 6.1: 화면 상태 및 로그인 관리 ---
           const [viewMode, setViewMode] = useState('login');
           const [loginType, setLoginType] = useState('student');
-const [inputRoomCode, setInputRoomCode] = useState(''); // 학생용 수업코드 입력값
-const [teacherRoomCode, setTeacherRoomCode] = useState(''); // 교사용 수업코드 입력값
-const [teacherPass, setTeacherPass] = useState(''); // 교사 비밀번호 입력값
-const [roomCode, setRoomCode] = useState(''); // 현재 확정된 수업 세션 코드
+
+          // 세션 관리 및 로그인 폼 상태
+          const [inputRoomCode, setInputRoomCode] = useState('');
+          const [teacherRoomCode, setTeacherRoomCode] = useState('');
+          const [teacherPass, setTeacherPass] = useState('');
+          const [roomCode, setRoomCode] = useState('');
           const [teacherAuthError, setTeacherAuthError] = useState(false);
 
           const [inputClass, setInputClass] = useState('');
@@ -294,120 +239,86 @@ const [roomCode, setRoomCode] = useState(''); // 현재 확정된 수업 세션 
           const [inputName, setInputName] = useState('');
           const [currentStudentId, setCurrentStudentId] = useState(null);
 
-          // --- 6.2: 네트워크 동기화 상태 감지 ---
           const [isConnected, setIsConnected] = useState(typeof window !== 'undefined' ? window.navigator.onLine : true);
 
-          // --- 6.3: 주사위 모션 및 상태 ---
           const [diceRotation, setDiceRotation] = useState({ x: 0, y: 0 });
           const [currentDiceValue, setCurrentDiceValue] = useState(1);
           const [isRolling, setIsRolling] = useState(false);
           const [transitionSpeed, setTransitionSpeed] = useState('normal');
 
-          // --- 6.4: 학급/모둠 실시간 공유 상태 ---
           const [students, setStudents] = useState([]);
           const [groupCount, setGroupCount] = useState(3);
           const [selectedTeacherTab, setSelectedTeacherTab] = useState('overview');
           const [activeGroupFilter, setActiveGroupFilter] = useState(1);
           const [isActivityPaused, setIsActivityPaused] = useState(false);
 
-          // --- 6.5: 데이터 정렬 상태 ---
           const [sortKey, setSortKey] = useState(null);
           const [sortOrder, setSortOrder] = useState('asc');
 
-          // --- 6.6: 멀티 디바이스 실시간 통신 (MQTT WebSocket) ---
           const mqttClientRef = useRef(null);
 
-const broadcastData = (subTopic, payload) => {<form onSubmit={handleTeacherLogin} className="space-y-4">
-    <div>
-      <label className="block text-xs font-bold text-slate-600 mb-1">수업 코드 (세션 생성 및 접속)</label>
-      <input 
-        type="text" 
-        placeholder="예: math201 또는 1001" 
-        value={teacherRoomCode} 
-        onChange={(e) => setTeacherRoomCode(e.target.value)} 
-        required 
-        className="w-full px-4 py-2.5 rounded-xl border border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 text-sm font-bold bg-indigo-50/50" 
-      />
-    </div>
-    <div>
-      <label className="block text-xs font-bold text-slate-600 mb-1">교사 비밀번호</label>
-      <div className="relative">
-        <input 
-          type="password" 
-          placeholder="비밀번호 입력" 
-          value={teacherPass} 
-          onChange={(e) => setTeacherPass(e.target.value)} 
-          required 
-          className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 text-sm" 
-        />
-        <IconLock className="w-4 h-4 text-slate-400 absolute right-3 top-3" />
-      </div>
-      {teacherAuthError && <p className="text-xs text-rose-500 mt-1">비밀번호가 올바르지 않습니다.</p>}
-    </div>
-    <button type="submit" className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg shadow-emerald-200 transition-all text-sm flex items-center justify-center space-x-2">
-      <IconGraduationCap className="w-5 h-5" />
-      <span>수업 세션 개설 / 대시보드 입장</span>
-    </button>
-  </form>
-)}
-  try {
-    if (mqttClientRef.current && mqttClientRef.current.connected && roomCode) {
-      const senderId = mqttClientRef.current.options?.clientId;
-      // 토픽 주소 중간에 ${roomCode}를 추가함
-      const fullTopic = `dice_math_lab_v1/${roomCode}/${subTopic}`;
-      mqttClientRef.current.publish(fullTopic, JSON.stringify({ ...payload, senderId }), { retain: true, qos: 0 });
-    }
-  } catch(e) {}
-};
+          // MQTT 데이터 전송 (senderId로 Echo 방지)
+          const broadcastData = (subTopic, payload) => {
+            try {
+              if (mqttClientRef.current && mqttClientRef.current.connected && roomCode) {
+                const senderId = mqttClientRef.current.options?.clientId;
+                const fullTopic = `dice_math_lab_v1/${roomCode}/${subTopic}`;
+                mqttClientRef.current.publish(fullTopic, JSON.stringify({ ...payload, senderId }), { retain: true, qos: 0 });
+              }
+            } catch(e) {}
+          };
 
-useEffect(() => {
-  // 수업 코드가 입력되어 세션이 시작되었을 때만 웹소켓 통신 연결
-  if (!window.mqtt || !roomCode) return;
+          // MQTT 실시간 수신 및 방 코드 세션 재연결
+          useEffect(() => {
+            if (!window.mqtt || !roomCode) return;
 
-  setStudents([]); // 새 방에 들어왔으므로 이전 화면 데이터 초기화
+            setStudents([]); // 세션 전환 시 이전에 남아있던 화면 리셋
 
-  const client = window.mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
-    clientId: 'dice_lab_user_' + Math.random().toString(16).substring(2, 9),
-    keepalive: 30
-  });
-  mqttClientRef.current = client;
+            const client = window.mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
+              clientId: 'dice_lab_user_' + Math.random().toString(16).substring(2, 9),
+              keepalive: 30
+            });
+            mqttClientRef.current = client;
 
-  client.on('connect', () => {
-    setIsConnected(true);
-    // 로그인할 때 정한 수업 코드(roomCode) 전용 채널 구독
-    client.subscribe(`dice_math_lab_v1/${roomCode}/students/+`);
-    client.subscribe(`dice_math_lab_v1/${roomCode}/settings`);
-  });
+            client.on('connect', () => {
+              setIsConnected(true);
+              client.subscribe(`dice_math_lab_v1/${roomCode}/students/+`);
+              client.subscribe(`dice_math_lab_v1/${roomCode}/settings`);
+            });
 
-  client.on('message', (topic, message) => {
-    try {
-      const payload = JSON.parse(message.toString());
-      if (payload.senderId && payload.senderId === mqttClientRef.current?.options?.clientId) return;
+            client.on('message', (topic, message) => {
+              try {
+                const payload = JSON.parse(message.toString());
 
-      if (topic.startsWith(`dice_math_lab_v1/${roomCode}/students/`)) {
-        setStudents(prev => {
-          if (payload.deleted) return prev.filter(s => s.id !== payload.id);
-          const idx = prev.findIndex(s => s.id === payload.id);
-          if (idx >= 0) {
-            const updated = [...prev];
-            updated[idx] = { ...updated[idx], ...payload };
-            return updated;
-          }
-          return [...prev, payload];
-        });
-      } else if (topic === `dice_math_lab_v1/${roomCode}/settings`) {
-        if (payload.isActivityPaused !== undefined) setIsActivityPaused(payload.isActivityPaused);
-        if (payload.groupCount !== undefined) setGroupCount(payload.groupCount);
-      }
-    } catch(e) {}
-  });
+                // 내가 보낸 데이터가 서버 거쳐서 되돌아올 때 최신 UI 덮어쓰기 방지
+                if (payload.senderId && payload.senderId === mqttClientRef.current?.options?.clientId) return;
 
-  return () => {
-    if (client) client.end();
-  };
-}, [roomCode]); // roomCode가 입력/변경되면 즉시 채널 재연결
+                if (topic.startsWith(`dice_math_lab_v1/${roomCode}/students/`)) {
+                  setStudents(prev => {
+                    if (payload.deleted) return prev.filter(s => s.id !== payload.id);
+                    const idx = prev.findIndex(s => s.id === payload.id);
+                    if (idx >= 0) {
+                      const updated = [...prev];
+                      updated[idx] = { ...updated[idx], ...payload };
+                      return updated;
+                    }
+                    return [...prev, payload];
+                  });
+                } else if (topic === `dice_math_lab_v1/${roomCode}/settings`) {
+                  if (payload.isActivityPaused !== undefined) setIsActivityPaused(payload.isActivityPaused);
+                  if (payload.groupCount !== undefined) setGroupCount(payload.groupCount);
+                }
+              } catch(e) {}
+            });
 
-          // --- 6.7: 테이블 정렬 기능 ---
+            client.on('offline', () => setIsConnected(false));
+            client.on('error', () => setIsConnected(false));
+
+            return () => {
+              if (client) client.end();
+            };
+          }, [roomCode]);
+
           const handleSort = (key) => {
             if (sortKey === key) setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
             else { setSortKey(key); setSortOrder(key === 'total' ? 'desc' : 'asc'); }
@@ -438,56 +349,62 @@ useEffect(() => {
 
           const currentStudent = useMemo(() => students.find(s => s.id === currentStudentId) || null, [students, currentStudentId]);
 
-          // --- 6.8: 학생 로그인 및 생성 ---
-const handleStudentLogin = async (e) => {
-  e.preventDefault();
-  if (!inputClass.trim() || !inputNumber.trim() || !inputName.trim() || !inputRoomCode.trim()) {
-    alert("반, 번호, 이름, 수업 코드를 모두 입력해 주세요.");
-    return;
-  }
+          // 학생 로그인
+          const handleStudentLogin = async (e) => {
+            e.preventDefault();
+            if (!inputClass.trim() || !inputNumber.trim() || !inputName.trim() || !inputRoomCode.trim()) {
+              alert("반, 번호, 이름, 수업 코드를 모두 입력해 주세요.");
+              return;
+            }
 
-  const selectedCode = inputRoomCode.trim();
-  setRoomCode(selectedCode); // 입력한 수업 코드로 세션 지정
+            const selectedCode = inputRoomCode.trim();
+            setRoomCode(selectedCode);
 
-  const formattedNum = `2학년 ${inputClass}반 ${inputNumber}번`;
-  const existing = students.find(s => s.studentNum === formattedNum);
+            const formattedNum = `2학년 ${inputClass}반 ${inputNumber}번`;
+            const existing = students.find(s => s.studentNum === formattedNum);
 
-  if (existing) {
-    setCurrentStudentId(existing.id);
-  } else {
-    const newStudentId = Date.now().toString();
-    const newStudentData = {
-      studentNum: formattedNum,
-      name: inputName.trim(),
-      groupId: 1,
-      counts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
-      total: 0,
-      logs: []
-    };
+            if (existing) {
+              setCurrentStudentId(existing.id);
+            } else {
+              const newStudentId = Date.now().toString();
+              const newStudentData = {
+                studentNum: formattedNum,
+                name: inputName.trim(),
+                groupId: 1,
+                counts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
+                total: 0,
+                logs: []
+              };
 
-    const updatedList = [...students, { id: newStudentId, ...newStudentData }];
-    setStudents(updatedList);
-    setCurrentStudentId(newStudentId);
+              const updatedList = [...students, { id: newStudentId, ...newStudentData }];
+              setStudents(updatedList);
+              setCurrentStudentId(newStudentId);
 
-    broadcastData(`students/${newStudentId}`, { id: newStudentId, ...newStudentData });
-  }
+              broadcastData(`students/${newStudentId}`, { id: newStudentId, ...newStudentData });
+            }
 
-  setViewMode('student');
-};
+            setViewMode('student');
+          };
 
-const handleTeacherLogin = (e) => {
-  e.preventDefault();
-  if (!teacherRoomCode.trim() || !teacherPass.trim()) {
-    alert("수업 코드와 비밀번호를 모두 입력해 주세요.");
-    return;
-  }
+          // 교사 로그인
+          const handleTeacherLogin = (e) => {
+            e.preventDefault();
+            if (!teacherRoomCode.trim() || !teacherPass.trim()) {
+              alert("수업 코드와 비밀번호를 모두 입력해 주세요.");
+              return;
+            }
 
-  const selectedCode = teacherRoomCode.trim();
-  setRoomCode(selectedCode); // 교사가 생성/접속할 수업 코드로 세션 지정
-  setTeacherAuthError(false);
-  setViewMode('teacher');
-};
-          // --- 6.9: 주사위 던지기 핵심 로직 ---
+            if (teacherPass.trim() === '1129') {
+              const selectedCode = teacherRoomCode.trim();
+              setRoomCode(selectedCode);
+              setTeacherAuthError(false);
+              setViewMode('teacher');
+            } else {
+              setTeacherAuthError(true);
+            }
+          };
+
+          // 주사위 던지기
           const startDiceRoll = async (count) => {
             if (!currentStudentId || isActivityPaused || isRolling) return;
 
@@ -516,7 +433,7 @@ const handleTeacherLogin = (e) => {
                 ...st, counts: { ...currentCounts }, total: currentTotal, logs: [...currentLogs]
               } : st));
 
-              broadcastData(`dice_math_lab_v1/students/${currentStudentId}`, {
+              broadcastData(`students/${currentStudentId}`, {
                 id: currentStudentId,
                 studentNum: targetStudent ? targetStudent.studentNum : '',
                 name: targetStudent ? targetStudent.name : '',
@@ -536,19 +453,19 @@ const handleTeacherLogin = (e) => {
             if (!currentStudentId) return;
             const resetData = { counts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }, total: 0, logs: [] };
             setStudents(prev => prev.map(st => st.id === currentStudentId ? { ...st, ...resetData } : st));
-            broadcastData(`dice_math_lab_v1/students/${currentStudentId}`, { id: currentStudentId, ...resetData });
+            broadcastData(`students/${currentStudentId}`, { id: currentStudentId, ...resetData });
           };
 
           const handleKickStudent = (studentId) => {
             setStudents(prev => prev.filter(s => s.id !== studentId));
-            broadcastData(`dice_math_lab_v1/students/${studentId}`, { id: studentId, deleted: true });
+            broadcastData(`students/${studentId}`, { id: studentId, deleted: true });
           };
 
           const handleGroupChange = (studentId, newGroupId) => {
             setStudents(prev => prev.map(st => st.id === studentId ? { ...st, groupId: Number(newGroupId) } : st));
             const st = students.find(s => s.id === studentId);
             if (st) {
-              broadcastData(`dice_math_lab_v1/students/${studentId}`, { ...st, groupId: Number(newGroupId) });
+              broadcastData(`students/${studentId}`, { ...st, groupId: Number(newGroupId) });
             }
           };
 
@@ -556,7 +473,7 @@ const handleTeacherLogin = (e) => {
             setStudents(prev => {
               const updated = prev.map((st, idx) => {
                 const assignedGroup = (idx % groupCount) + 1;
-                broadcastData(`dice_math_lab_v1/students/${st.id}`, { ...st, groupId: assignedGroup });
+                broadcastData(`students/${st.id}`, { ...st, groupId: assignedGroup });
                 return { ...st, groupId: assignedGroup };
               });
               return updated;
@@ -564,14 +481,14 @@ const handleTeacherLogin = (e) => {
           };
 
           const handleResetAllData = () => {
+            if (!confirm("현재 학급 학생들의 주사위 기록을 모두 초기화하시겠습니까?")) return;
             const resetData = { counts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }, total: 0, logs: [] };
             setStudents(prev => prev.map(st => {
-              broadcastData(`dice_math_lab_v1/students/${st.id}`, { ...st, ...resetData });
+              broadcastData(`students/${st.id}`, { ...st, ...resetData });
               return { ...st, ...resetData };
             }));
           };
 
-          // --- 6.10: 통계 수치 연산 ---
           const calculateChartData = (countsObj, totalCount) => {
             return [1, 2, 3, 4, 5, 6].map(num => {
               const count = countsObj[num] || 0;
@@ -601,7 +518,6 @@ const handleTeacherLogin = (e) => {
             return { studentCount: students.length, total: combinedTotal, counts: combinedCounts, chartData: calculateChartData(combinedCounts, combinedTotal) };
           };
 
-          // --- 6.11: 메인 UI 렌더링 ---
           return (
             <div className="min-h-screen bg-slate-50 text-slate-800 font-sans">
               <style>{`
@@ -671,10 +587,10 @@ const handleTeacherLogin = (e) => {
                       <div className="p-6">
                         {loginType === 'student' ? (
                           <form onSubmit={handleStudentLogin} className="space-y-4">
-<div>
-  <label className="block text-xs font-bold text-slate-600 mb-1">수업 코드</label>
-  <input type="text" placeholder="선생님이 안내한 수업 코드 (예: math201)" value={inputRoomCode} onChange={(e) => setInputRoomCode(e.target.value)} required className="w-full px-4 py-2.5 rounded-xl border border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 text-sm font-bold bg-indigo-50/50" />
-</div>
+                            <div>
+                              <label className="block text-xs font-bold text-slate-600 mb-1">수업 코드</label>
+                              <input type="text" placeholder="선생님이 안내한 수업 코드 (예: math201)" value={inputRoomCode} onChange={(e) => setInputRoomCode(e.target.value)} required className="w-full px-4 py-2.5 rounded-xl border border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 text-sm font-bold bg-indigo-50/50" />
+                            </div>
                             <div>
                               <label className="block text-xs font-bold text-slate-600 mb-1">학년</label>
                               <input type="text" value="2학년" disabled className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-100 text-slate-500 font-bold text-sm cursor-not-allowed" />
@@ -707,16 +623,34 @@ const handleTeacherLogin = (e) => {
                         ) : (
                           <form onSubmit={handleTeacherLogin} className="space-y-4">
                             <div>
+                              <label className="block text-xs font-bold text-slate-600 mb-1">수업 코드 (세션 생성 및 접속)</label>
+                              <input 
+                                type="text" 
+                                placeholder="예: math201 또는 1001" 
+                                value={teacherRoomCode} 
+                                onChange={(e) => setTeacherRoomCode(e.target.value)} 
+                                required 
+                                className="w-full px-4 py-2.5 rounded-xl border border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 text-sm font-bold bg-indigo-50/50" 
+                              />
+                            </div>
+                            <div>
                               <label className="block text-xs font-bold text-slate-600 mb-1">교사 비밀번호</label>
                               <div className="relative">
-                                <input type="password" placeholder="비밀번호 입력" value={teacherPass} onChange={(e) => setTeacherPass(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 text-sm" />
+                                <input 
+                                  type="password" 
+                                  placeholder="비밀번호 입력 (기본: 1129)" 
+                                  value={teacherPass} 
+                                  onChange={(e) => setTeacherPass(e.target.value)} 
+                                  required 
+                                  className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 text-sm" 
+                                />
                                 <IconLock className="w-4 h-4 text-slate-400 absolute right-3 top-3" />
                               </div>
                               {teacherAuthError && <p className="text-xs text-rose-500 mt-1">비밀번호가 올바르지 않습니다.</p>}
                             </div>
                             <button type="submit" className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg shadow-emerald-200 transition-all text-sm flex items-center justify-center space-x-2">
                               <IconGraduationCap className="w-5 h-5" />
-                              <span>교사 관리자 화면 이동</span>
+                              <span>수업 세션 개설 / 대시보드 입장</span>
                             </button>
                           </form>
                         )}
@@ -864,34 +798,17 @@ const handleTeacherLogin = (e) => {
 
                 {viewMode === 'teacher' && (
                   <div className="space-y-6">
-<div className="bg-indigo-900 text-white p-5 rounded-2xl flex flex-col sm:flex-row items-center justify-between shadow-lg gap-4">
-      <div>
-        <span className="text-xs text-indigo-200 font-semibold block">학생들에게 안내할 수업 코드</span>
-        <span className="text-3xl font-black text-yellow-300 tracking-wider">{roomCode}</span>
-      </div>
-      <div className="text-xs text-indigo-200 text-right">
-        <span>현재 세션에 접속한 학생들의 데이터만 실시간 집계됩니다.</span>
-      </div>
-    </div>
-  <div className="flex space-x-2">
-    <button 
-      onClick={() => {
-        if (confirm("현재 수업 세션을 종료하고 학생 목록을 전체 비우시겠습니까?")) {
-          // 기존 학생들에게 퇴장 명령어 전송
-          students.forEach(st => broadcastData(`students/${st.id}`, { id: st.id, deleted: true }));
-          setStudents([]);
-          // 새로운 4자리 입장 코드 생성 (예: 5829)
-          const newCode = Math.floor(1000 + Math.random() * 9000).toString();
-          setRoomCode(newCode);
-        }
-      }}
-      className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow transition-all flex items-center space-x-1"
-    >
-      <IconRotateCcw className="w-4 h-4" />
-      <span>수업 종료 및 새 방 만들기</span>
-    </button>
-  </div>
-</div>
+                    {/* 상단 수업 코드 안내 카드 */}
+                    <div className="bg-indigo-900 text-white p-5 rounded-2xl flex flex-col sm:flex-row items-center justify-between shadow-lg gap-4">
+                      <div>
+                        <span className="text-xs text-indigo-200 font-semibold block">학생들에게 안내할 수업 코드</span>
+                        <span className="text-3xl font-black text-yellow-300 tracking-wider">{roomCode}</span>
+                      </div>
+                      <div className="text-xs text-indigo-200 text-right">
+                        <span>현재 세션에 접속한 학생들의 데이터만 실시간 집계됩니다.</span>
+                      </div>
+                    </div>
+
                     <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                       <div>
                         <h2 className="text-xl font-black text-slate-800 flex items-center space-x-2">
@@ -908,7 +825,7 @@ const handleTeacherLogin = (e) => {
                         <button onClick={() => { 
                           const nextPause = !isActivityPaused;
                           setIsActivityPaused(nextPause);
-                          broadcastData('dice_math_lab_v1/settings', { isActivityPaused: nextPause });
+                          broadcastData('settings', { isActivityPaused: nextPause });
                         }} className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center space-x-1 shadow-sm ${isActivityPaused ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-amber-500 text-white hover:bg-amber-600'}`}>
                           <IconShieldAlert className="w-4 h-4" />
                           <span>{isActivityPaused ? '학생 활동 재개' : '학생 활동 일시정지'}</span>
@@ -952,7 +869,7 @@ const handleTeacherLogin = (e) => {
                               <select value={groupCount} onChange={(e) => { 
                                 const cnt = Number(e.target.value); 
                                 setGroupCount(cnt); 
-                                broadcastData('dice_math_lab_v1/settings', { groupCount: cnt });
+                                broadcastData('settings', { groupCount: cnt });
                               }} className="px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500">
                                 {[2, 3, 4, 5, 6, 7, 8].map(n => <option key={n} value={n}>{n}개 모둠</option>)}
                               </select>
@@ -1128,54 +1045,54 @@ const handleTeacherLogin = (e) => {
                                 </div>
                               </div>
 
-<div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-6">
-  <div>
-    <h4 className="text-base font-bold text-slate-800 mb-1 flex items-center space-x-2">
-      <IconBarChart3 className="w-5 h-5 text-emerald-600" />
-      <span>학급 전체 상대도수 그래프 (합계: {classData.total}회)</span>
-    </h4>
-    <p className="text-xs text-slate-500 mb-4">시행 횟수가 매우 커질 때 각 눈의 상대도수가 수학적 확률 1/6(≈0.167)에 가까워지는지 확인해 보세요.</p>
+                              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-6">
+                                <div>
+                                  <h4 className="text-base font-bold text-slate-800 mb-1 flex items-center space-x-2">
+                                    <IconBarChart3 className="w-5 h-5 text-emerald-600" />
+                                    <span>학급 전체 상대도수 그래프 (합계: {classData.total}회)</span>
+                                  </h4>
+                                  <p className="text-xs text-slate-500 mb-4">시행 횟수가 매우 커질 때 각 눈의 상대도수가 수학적 확률 1/6(≈0.167)에 가까워지는지 확인해 보세요.</p>
 
-    <div className="h-72 w-full">
-      <SafeChart data={classData.chartData} height={288} barColor="#10b981" />
-    </div>
-  </div>
+                                  <div className="h-72 w-full">
+                                    <SafeChart data={classData.chartData} height={288} barColor="#10b981" />
+                                  </div>
+                                </div>
 
-  {/* 학급 전체 상세 집계 표 */}
-  <div className="border-t border-slate-100 pt-5">
-    <div className="overflow-x-auto">
-      <table className="w-full text-center text-xs sm:text-sm">
-        <thead>
-          <tr className="bg-slate-100 text-slate-600 font-bold border-b border-slate-200">
-            <th className="py-2.5 px-3 rounded-l-lg">눈의 수</th>
-            <th className="py-2.5 px-3">합산 횟수</th>
-            <th className="py-2.5 px-3 rounded-r-lg">상대도수</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100">
-          {[1, 2, 3, 4, 5, 6].map(num => {
-            const count = classData.counts[num] || 0;
-            const rel = classData.total > 0 ? (count / classData.total).toFixed(3) : '0.000';
-            return (
-              <tr key={num} className="hover:bg-slate-50 transition-colors">
-                <td className="py-2.5 font-bold text-emerald-700 bg-emerald-50/50">{num}</td>
-                <td className="py-2.5 font-semibold text-slate-700">{count}회</td>
-                <td className="py-2.5 font-mono font-bold text-slate-800">{rel}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-        <tfoot>
-          <tr className="bg-emerald-50/80 font-bold text-emerald-900 border-t-2 border-emerald-200">
-            <td className="py-2.5">합계</td>
-            <td className="py-2.5">{classData.total}회</td>
-            <td className="py-2.5 font-mono">{classData.total > 0 ? '1.000' : '0.000'}</td>
-          </tr>
-        </tfoot>
-      </table>
-    </div>
-  </div>
-</div>
+                                {/* 학급 전체 상세 집계 표 */}
+                                <div className="border-t border-slate-100 pt-5">
+                                  <div className="overflow-x-auto">
+                                    <table className="w-full text-center text-xs sm:text-sm">
+                                      <thead>
+                                        <tr className="bg-slate-100 text-slate-600 font-bold border-b border-slate-200">
+                                          <th className="py-2.5 px-3 rounded-l-lg">눈의 수</th>
+                                          <th className="py-2.5 px-3">합산 횟수</th>
+                                          <th className="py-2.5 px-3 rounded-r-lg">상대도수</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-slate-100">
+                                        {[1, 2, 3, 4, 5, 6].map(num => {
+                                          const count = classData.counts[num] || 0;
+                                          const rel = classData.total > 0 ? (count / classData.total).toFixed(3) : '0.000';
+                                          return (
+                                            <tr key={num} className="hover:bg-slate-50 transition-colors">
+                                              <td className="py-2.5 font-bold text-emerald-700 bg-emerald-50/50">{num}</td>
+                                              <td className="py-2.5 font-semibold text-slate-700">{count}회</td>
+                                              <td className="py-2.5 font-mono font-bold text-slate-800">{rel}</td>
+                                            </tr>
+                                          );
+                                        })}
+                                      </tbody>
+                                      <tfoot>
+                                        <tr className="bg-emerald-50/80 font-bold text-emerald-900 border-t-2 border-emerald-200">
+                                          <td className="py-2.5">합계</td>
+                                          <td className="py-2.5">{classData.total}회</td>
+                                          <td className="py-2.5 font-mono">{classData.total > 0 ? '1.000' : '0.000'}</td>
+                                        </tr>
+                                      </tfoot>
+                                    </table>
+                                  </div>
+                                </div>
+                              </div>
 
                               <div className="bg-emerald-50 border border-emerald-200 p-6 rounded-2xl">
                                 <h4 className="font-bold text-emerald-950 text-base mb-2 flex items-center space-x-2">
