@@ -314,13 +314,14 @@
           // --- 6.6: 멀티 디바이스 실시간 통신 (MQTT WebSocket) ---
           const mqttClientRef = useRef(null);
 
-          const broadcastData = (topic, payload) => {
-            try {
-              if (mqttClientRef.current && mqttClientRef.current.connected) {
-                mqttClientRef.current.publish(topic, JSON.stringify(payload), { retain: true, qos: 0 });
-              }
-            } catch(e) {}
-          };
+const broadcastData = (topic, payload) => {
+  try {
+    if (mqttClientRef.current && mqttClientRef.current.connected) {
+      const senderId = mqttClientRef.current.options?.clientId;
+      mqttClientRef.current.publish(topic, JSON.stringify({ ...payload, senderId }), { retain: true, qos: 0 });
+    }
+  } catch(e) {}
+};
 
           useEffect(() => {
             if (window.mqtt) {
@@ -336,11 +337,14 @@
                 client.subscribe('dice_math_lab_v1/settings');
               });
 
-              client.on('message', (topic, message) => {
-                try {
-                  const payload = JSON.parse(message.toString());
-                  if (topic.startsWith('dice_math_lab_v1/students/')) {
-                    setStudents(prev => {
+client.on('message', (topic, message) => {
+  try {
+    const payload = JSON.parse(message.toString());
+    // 내가 보낸 데이터가 서버를 거쳐 되돌아온 경우 내 화면 덮어쓰기 방지
+    if (payload.senderId && payload.senderId === mqttClientRef.current?.options?.clientId) return;
+
+    if (topic.startsWith('dice_math_lab_v1/students/')) {
+      setStudents(prev => {
                       if (payload.deleted) return prev.filter(s => s.id !== payload.id);
                       const idx = prev.findIndex(s => s.id === payload.id);
                       if (idx >= 0) {
@@ -1047,14 +1051,54 @@
                                 </div>
                               </div>
 
-                              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                                <h4 className="text-base font-bold text-slate-800 mb-1">학급 전체 상대도수 그래프</h4>
-                                <p className="text-xs text-slate-500 mb-4">시행 횟수가 매우 커질 때 각 눈의 상대도수가 수학적 확률 1/6(≈0.167)에 가까워지는지 확인해 보세요.</p>
+<div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-6">
+  <div>
+    <h4 className="text-base font-bold text-slate-800 mb-1 flex items-center space-x-2">
+      <IconBarChart3 className="w-5 h-5 text-emerald-600" />
+      <span>학급 전체 상대도수 그래프 (합계: {classData.total}회)</span>
+    </h4>
+    <p className="text-xs text-slate-500 mb-4">시행 횟수가 매우 커질 때 각 눈의 상대도수가 수학적 확률 1/6(≈0.167)에 가까워지는지 확인해 보세요.</p>
 
-                                <div className="h-72 w-full">
-                                  <SafeChart data={classData.chartData} height={288} barColor="#10b981" />
-                                </div>
-                              </div>
+    <div className="h-72 w-full">
+      <SafeChart data={classData.chartData} height={288} barColor="#10b981" />
+    </div>
+  </div>
+
+  {/* 학급 전체 상세 집계 표 */}
+  <div className="border-t border-slate-100 pt-5">
+    <div className="overflow-x-auto">
+      <table className="w-full text-center text-xs sm:text-sm">
+        <thead>
+          <tr className="bg-slate-100 text-slate-600 font-bold border-b border-slate-200">
+            <th className="py-2.5 px-3 rounded-l-lg">눈의 수</th>
+            <th className="py-2.5 px-3">합산 횟수</th>
+            <th className="py-2.5 px-3 rounded-r-lg">상대도수</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100">
+          {[1, 2, 3, 4, 5, 6].map(num => {
+            const count = classData.counts[num] || 0;
+            const rel = classData.total > 0 ? (count / classData.total).toFixed(3) : '0.000';
+            return (
+              <tr key={num} className="hover:bg-slate-50 transition-colors">
+                <td className="py-2.5 font-bold text-emerald-700 bg-emerald-50/50">{num}</td>
+                <td className="py-2.5 font-semibold text-slate-700">{count}회</td>
+                <td className="py-2.5 font-mono font-bold text-slate-800">{rel}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+        <tfoot>
+          <tr className="bg-emerald-50/80 font-bold text-emerald-900 border-t-2 border-emerald-200">
+            <td className="py-2.5">합계</td>
+            <td className="py-2.5">{classData.total}회</td>
+            <td className="py-2.5 font-mono">{classData.total > 0 ? '1.000' : '0.000'}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+</div>
 
                               <div className="bg-emerald-50 border border-emerald-200 p-6 rounded-2xl">
                                 <h4 className="font-bold text-emerald-950 text-base mb-2 flex items-center space-x-2">
