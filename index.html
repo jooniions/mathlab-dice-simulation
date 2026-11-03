@@ -114,6 +114,8 @@
         const IconArrowUpDown = (p) => <IconBase {...p}><path d="m21 16-4 4-4-4" /><path d="M17 20V4" /><path d="m3 8 4-4 4 4" /><path d="M7 4v16" /></IconBase>;
         const IconArrowUp = (p) => <IconBase {...p}><line x1="12" y1="19" x2="12" y2="5" /><polyline points="5 12 12 5 19 12" /></IconBase>;
         const IconArrowDown = (p) => <IconBase {...p}><line x1="12" y1="5" x2="12" y2="19" /><polyline points="19 12 12 19 5 12" /></IconBase>;
+        const IconPlusCircle = (p) => <IconBase {...p}><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="16" /><line x1="8" y1="12" x2="16" y2="12" /></IconBase>;
+        const IconLogIn = (p) => <IconBase {...p}><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" /><polyline points="10 17 15 12 10 7" /><line x1="15" y1="12" x2="3" y2="12" /></IconBase>;
 
         // =========================================================================
         // SECTION 3: Audio API 기반 주사위 효과음
@@ -220,6 +222,9 @@
           return { x: getNextAngle(currentRot.x, target.x), y: getNextAngle(currentRot.y, target.y) };
         };
 
+        // 2주(14일) 밀리초 단위 상수
+        const TWO_WEEKS_MS = 14 * 24 * 60 * 60 * 1000;
+
         // =========================================================================
         // SECTION 5: 메인 애플리케이션 컴포넌트 (App)
         // =========================================================================
@@ -227,12 +232,21 @@
           const [viewMode, setViewMode] = useState('login');
           const [loginType, setLoginType] = useState('student');
 
+          // 교사 세션 서브탭 ('create': 수업 개설, 'join': 기존 수업 접속)
+          const [teacherSubMode, setTeacherSubMode] = useState('create');
+
           // 세션 관리 및 로그인 폼 상태
           const [inputRoomCode, setInputRoomCode] = useState('');
-          const [teacherRoomCode, setTeacherRoomCode] = useState('');
-          const [teacherPass, setTeacherPass] = useState('');
+          const [createdRoomCode, setCreatedRoomCode] = useState('');
+          const [createPass, setCreatePass] = useState('');
+          
+          const [joinRoomCode, setJoinRoomCode] = useState('');
+          const [joinPass, setJoinPass] = useState('');
+
+          const [pendingTeacherPassCheck, setPendingTeacherPassCheck] = useState(null);
+
           const [roomCode, setRoomCode] = useState('');
-          const [teacherAuthError, setTeacherAuthError] = useState(false);
+          const [teacherAuthError, setTeacherAuthError] = useState('');
 
           const [inputClass, setInputClass] = useState('');
           const [inputNumber, setInputNumber] = useState('');
@@ -257,7 +271,20 @@
 
           const mqttClientRef = useRef(null);
 
-          // MQTT 데이터 전송 (senderId로 Echo 방지)
+          // 4자리 수업 코드 자동 생성 함수
+          const generateRoomCode = () => {
+            const code = Math.floor(1000 + Math.random() * 9000).toString();
+            setCreatedRoomCode(code);
+          };
+
+          // 교사 접속 탭 열릴 때 첫 4자리 코드 자동 생성
+          useEffect(() => {
+            if (loginType === 'teacher' && teacherSubMode === 'create' && !createdRoomCode) {
+              generateRoomCode();
+            }
+          }, [loginType, teacherSubMode]);
+
+          // MQTT 데이터 전송
           const broadcastData = (subTopic, payload) => {
             try {
               if (mqttClientRef.current && mqttClientRef.current.connected && roomCode) {
@@ -268,11 +295,11 @@
             } catch(e) {}
           };
 
-          // MQTT 실시간 수신 및 방 코드 세션 재연결
+          // MQTT 실시간 수신 및 방 코드 세션 연결
           useEffect(() => {
             if (!window.mqtt || !roomCode) return;
 
-            setStudents([]); // 세션 전환 시 이전에 남아있던 화면 리셋
+            setStudents([]); // 세션 전환 시 이전 명단 리셋
 
             const client = window.mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
               clientId: 'dice_lab_user_' + Math.random().toString(16).substring(2, 9),
@@ -290,7 +317,40 @@
               try {
                 const payload = JSON.parse(message.toString());
 
-                // 내가 보낸 데이터가 서버 거쳐서 되돌아올 때 최신 UI 덮어쓰기 방지
+                if (topic === `dice_math_lab_v1/${roomCode}/settings`) {
+                  // 2주(14일) 만료 체크
+                  if (payload.createdAt) {
+                    const elapsed = Date.now() - payload.createdAt;
+                    if (elapsed > TWO_WEEKS_MS) {
+                      alert("⚠️ 해당 수업 코드는 생성된 지 2주가 지나 만료(소멸)되었습니다.\n새로운 수업 코드를 생성해 주세요.");
+                      setRoomCode('');
+                      setViewMode('login');
+                      if (client) client.end();
+                      return;
+                    }
+                  }
+
+                  // 교사 기존 수업 접속 검증
+                  if (pendingTeacherPassCheck !== null) {
+                    if (payload.pass && payload.pass !== pendingTeacherPassCheck) {
+                      setTeacherAuthError('비밀번호가 올바르지 않습니다.');
+                      setPendingTeacherPassCheck(null);
+                      setRoomCode('');
+                      setViewMode('login');
+                      if (client) client.end();
+                      return;
+                    } else {
+                      setTeacherAuthError('');
+                      setPendingTeacherPassCheck(null);
+                      setViewMode('teacher');
+                    }
+                  }
+
+                  if (payload.isActivityPaused !== undefined) setIsActivityPaused(payload.isActivityPaused);
+                  if (payload.groupCount !== undefined) setGroupCount(payload.groupCount);
+                }
+
+                // 내가 보낸 데이터 Echo 방지
                 if (payload.senderId && payload.senderId === mqttClientRef.current?.options?.clientId) return;
 
                 if (topic.startsWith(`dice_math_lab_v1/${roomCode}/students/`)) {
@@ -304,9 +364,6 @@
                     }
                     return [...prev, payload];
                   });
-                } else if (topic === `dice_math_lab_v1/${roomCode}/settings`) {
-                  if (payload.isActivityPaused !== undefined) setIsActivityPaused(payload.isActivityPaused);
-                  if (payload.groupCount !== undefined) setGroupCount(payload.groupCount);
                 }
               } catch(e) {}
             });
@@ -317,7 +374,7 @@
             return () => {
               if (client) client.end();
             };
-          }, [roomCode]);
+          }, [roomCode, pendingTeacherPassCheck]);
 
           const handleSort = (key) => {
             if (sortKey === key) setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
@@ -386,22 +443,55 @@
             setViewMode('student');
           };
 
-          // 교사 로그인
-          const handleTeacherLogin = (e) => {
+          // 교사: 수업 개설 (새 세션 생성)
+          const handleCreateSession = (e) => {
             e.preventDefault();
-            if (!teacherRoomCode.trim() || !teacherPass.trim()) {
+            if (!createdRoomCode.trim()) {
+              alert("수업 코드를 생성해 주세요.");
+              return;
+            }
+            if (!createPass.trim()) {
+              alert("수업에 사용할 교사 비밀번호를 입력해 주세요.");
+              return;
+            }
+
+            const selectedCode = createdRoomCode.trim();
+            const setPassword = createPass.trim();
+
+            setTeacherAuthError('');
+            setRoomCode(selectedCode);
+            setViewMode('teacher');
+
+            // 수업 정보 MQTT 보로드캐스트 (생성 시각 포함 -> 2주 만료 관리)
+            setTimeout(() => {
+              broadcastData('settings', {
+                pass: setPassword,
+                createdAt: Date.now(),
+                isActivityPaused: false,
+                groupCount: 3
+              });
+            }, 600);
+          };
+
+          // 교사: 수업 접속 (기존 세션 입장)
+          const handleJoinSession = (e) => {
+            e.preventDefault();
+            if (!joinRoomCode.trim() || !joinPass.trim()) {
               alert("수업 코드와 비밀번호를 모두 입력해 주세요.");
               return;
             }
 
-            if (teacherPass.trim() === '1129') {
-              const selectedCode = teacherRoomCode.trim();
-              setRoomCode(selectedCode);
-              setTeacherAuthError(false);
-              setViewMode('teacher');
-            } else {
-              setTeacherAuthError(true);
-            }
+            const selectedCode = joinRoomCode.trim();
+            setTeacherAuthError('');
+            setPendingTeacherPassCheck(joinPass.trim());
+            setRoomCode(selectedCode);
+
+            setTimeout(() => {
+              if (pendingTeacherPassCheck !== null) {
+                setPendingTeacherPassCheck(null);
+                setViewMode('teacher');
+              }
+            }, 2500);
           };
 
           // 주사위 던지기
@@ -589,7 +679,7 @@
                           <form onSubmit={handleStudentLogin} className="space-y-4">
                             <div>
                               <label className="block text-xs font-bold text-slate-600 mb-1">수업 코드</label>
-                              <input type="text" placeholder="선생님이 안내한 수업 코드 (예: math201)" value={inputRoomCode} onChange={(e) => setInputRoomCode(e.target.value)} required className="w-full px-4 py-2.5 rounded-xl border border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 text-sm font-bold bg-indigo-50/50" />
+                              <input type="text" placeholder="선생님이 안내한 4자리 수업 코드" value={inputRoomCode} onChange={(e) => setInputRoomCode(e.target.value)} required className="w-full px-4 py-2.5 rounded-xl border border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 text-sm font-bold bg-indigo-50/50" />
                             </div>
                             <div>
                               <label className="block text-xs font-bold text-slate-600 mb-1">학년</label>
@@ -621,38 +711,109 @@
                             </button>
                           </form>
                         ) : (
-                          <form onSubmit={handleTeacherLogin} className="space-y-4">
-                            <div>
-                              <label className="block text-xs font-bold text-slate-600 mb-1">수업 코드 (세션 생성 및 접속)</label>
-                              <input 
-                                type="text" 
-                                placeholder="예: math201 또는 1001" 
-                                value={teacherRoomCode} 
-                                onChange={(e) => setTeacherRoomCode(e.target.value)} 
-                                required 
-                                className="w-full px-4 py-2.5 rounded-xl border border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 text-sm font-bold bg-indigo-50/50" 
-                              />
+                          <div className="space-y-4">
+                            {/* 교사 서브탭: 수업 개설 / 기존 수업 접속 */}
+                            <div className="flex bg-slate-100 p-1 rounded-xl">
+                              <button 
+                                type="button" 
+                                onClick={() => { setTeacherSubMode('create'); setTeacherAuthError(''); }} 
+                                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center space-x-1 ${teacherSubMode === 'create' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+                              >
+                                <IconPlusCircle className="w-3.5 h-3.5" />
+                                <span>수업 개설</span>
+                              </button>
+                              <button 
+                                type="button" 
+                                onClick={() => { setTeacherSubMode('join'); setTeacherAuthError(''); }} 
+                                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center space-x-1 ${teacherSubMode === 'join' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+                              >
+                                <IconLogIn className="w-3.5 h-3.5" />
+                                <span>기존 수업 접속</span>
+                              </button>
                             </div>
-                            <div>
-                              <label className="block text-xs font-bold text-slate-600 mb-1">교사 비밀번호</label>
-                              <div className="relative">
-                                <input 
-                                  type="password" 
-                                  placeholder="비밀번호 입력 (기본: 1129)" 
-                                  value={teacherPass} 
-                                  onChange={(e) => setTeacherPass(e.target.value)} 
-                                  required 
-                                  className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 text-sm" 
-                                />
-                                <IconLock className="w-4 h-4 text-slate-400 absolute right-3 top-3" />
-                              </div>
-                              {teacherAuthError && <p className="text-xs text-rose-500 mt-1">비밀번호가 올바르지 않습니다.</p>}
-                            </div>
-                            <button type="submit" className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg shadow-emerald-200 transition-all text-sm flex items-center justify-center space-x-2">
-                              <IconGraduationCap className="w-5 h-5" />
-                              <span>수업 세션 개설 / 대시보드 입장</span>
-                            </button>
-                          </form>
+
+                            {teacherSubMode === 'create' ? (
+                              <form onSubmit={handleCreateSession} className="space-y-4">
+                                <div>
+                                  <div className="flex justify-between items-center mb-1">
+                                    <label className="block text-xs font-bold text-slate-600">수업 코드 (자동 생성)</label>
+                                    <button 
+                                      type="button" 
+                                      onClick={generateRoomCode}
+                                      className="text-xs text-indigo-600 hover:text-indigo-800 font-bold flex items-center space-x-1"
+                                    >
+                                      <IconRefreshCw className="w-3 h-3" />
+                                      <span>수업 코드 다시 생성</span>
+                                    </button>
+                                  </div>
+                                  <div className="relative flex items-center">
+                                    <input 
+                                      type="text" 
+                                      value={createdRoomCode} 
+                                      readOnly 
+                                      className="w-full px-4 py-3 rounded-xl border-2 border-indigo-200 bg-indigo-50/70 text-indigo-900 font-black text-center text-xl tracking-widest focus:outline-none select-all" 
+                                    />
+                                  </div>
+                                  <p className="text-[11px] text-slate-400 mt-1">※ 생성된 수업 코드는 <span className="font-bold text-amber-600">2주 후 자동으로 소멸</span>됩니다.</p>
+                                </div>
+
+                                <div>
+                                  <label className="block text-xs font-bold text-slate-600 mb-1">교사 비밀번호 설정</label>
+                                  <div className="relative">
+                                    <input 
+                                      type="password" 
+                                      placeholder="수업에 사용할 비밀번호 설정" 
+                                      value={createPass} 
+                                      onChange={(e) => setCreatePass(e.target.value)} 
+                                      required 
+                                      className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 text-sm" 
+                                    />
+                                    <IconLock className="w-4 h-4 text-slate-400 absolute right-3 top-3" />
+                                  </div>
+                                </div>
+
+                                <button type="submit" className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg shadow-emerald-200 transition-all text-sm flex items-center justify-center space-x-2">
+                                  <IconGraduationCap className="w-5 h-5" />
+                                  <span>새 수업 개설 및 대시보드 입장</span>
+                                </button>
+                              </form>
+                            ) : (
+                              <form onSubmit={handleJoinSession} className="space-y-4">
+                                <div>
+                                  <label className="block text-xs font-bold text-slate-600 mb-1">수업 코드 입력</label>
+                                  <input 
+                                    type="text" 
+                                    placeholder="4자리 수업 코드 입력 (예: 5829)" 
+                                    value={joinRoomCode} 
+                                    onChange={(e) => setJoinRoomCode(e.target.value)} 
+                                    required 
+                                    className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 text-sm font-bold bg-slate-50" 
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="block text-xs font-bold text-slate-600 mb-1">교사 비밀번호</label>
+                                  <div className="relative">
+                                    <input 
+                                      type="password" 
+                                      placeholder="비밀번호 입력" 
+                                      value={joinPass} 
+                                      onChange={(e) => setJoinPass(e.target.value)} 
+                                      required 
+                                      className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 text-sm" 
+                                    />
+                                    <IconLock className="w-4 h-4 text-slate-400 absolute right-3 top-3" />
+                                  </div>
+                                  {teacherAuthError && <p className="text-xs text-rose-500 font-semibold mt-1">{teacherAuthError}</p>}
+                                </div>
+
+                                <button type="submit" className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg shadow-indigo-200 transition-all text-sm flex items-center justify-center space-x-2">
+                                  <IconLogIn className="w-4 h-4" />
+                                  <span>기존 수업 대시보드 접속</span>
+                                </button>
+                              </form>
+                            )}
+                          </div>
                         )}
                       </div>
                     </div>
