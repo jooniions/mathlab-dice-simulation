@@ -803,40 +803,19 @@
 
                   <div className="lg:col-span-7 space-y-4">
                     {/* [신규] 한 줄 탭 메뉴 (나의 결과, 모둠 결과, 학급 전체 결과) */}
-                    <div className="flex space-x-2 border-b border-slate-200 pb-2">
-                      <button
-                        onClick={() => setSelectedStudentTab('my')}
-                        className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                          selectedStudentTab === 'my'
-                            ? 'bg-indigo-600 text-white shadow-md'
-                            : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-                        }`}
-                      >
-                        나의 결과
-                      </button>
-                      <button
-                        onClick={() => setSelectedStudentTab('group')}
-                        className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                          selectedStudentTab === 'group'
-                            ? 'bg-indigo-600 text-white shadow-md'
-                            : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-                        }`}
-                      >
-                        모둠 결과
-                      </button>
-                      <button
-                        onClick={() => setSelectedStudentTab('class')}
-                        className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                          selectedStudentTab === 'class'
-                            ? 'bg-indigo-600 text-white shadow-md'
-                            : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-                        }`}
-                      >
-                        학급 전체 결과
-                      </button>
-                    </div>
+                        <div className="flex justify-center space-x-2 border-t border-slate-200 pt-3 overflow-x-auto">
+                          <button onClick={() => setStudentTab('mine')} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${studentTab === 'mine' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}>
+                            나의 실험 결과
+                          </button>
+                          <button onClick={() => setStudentTab('group')} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${studentTab === 'group' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}>
+                            모둠 실험 결과
+                          </button>
+                          <button onClick={() => setStudentTab('class')} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${studentTab === 'class' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}>
+                            학급 전체 실험 결과
+                          </button>
+                        </div>
 
-                    {/* 탭 1: 나의 결과 */}
+                    {/* 탭 1: 나의 실험 결과 */}
                     {selectedStudentTab === 'my' && (
                       <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
                         <div className="flex justify-between items-center mb-4">
@@ -889,7 +868,7 @@
                       </div>
                     )}
 
-                    {/* 탭 2: 모둠 결과 */}
+                    {/* 탭 2: 모둠 실험 결과 */}
                     {selectedStudentTab === 'group' && (() => {
                       const myGroupData = getGroupAggregate(currentStudent.groupId);
                       return (
@@ -899,7 +878,7 @@
                               <IconBarChart3 className="w-5 h-5 text-indigo-600" />
                               <span>{currentStudent.groupId}모둠 상대도수 그래프 (합계: {myGroupData.total}회)</span>
                             </h4>
-                            <p className="text-xs text-slate-500 mb-4">모둠원 데이터가 실시간으로 합산되어 표시됩니다.</p>
+                            <p className="text-xs text-slate-500 mb-4">모둠원의 실험 데이터가 실시간으로 합산되어 표시됩니다.</p>
                             <div className="h-64 w-full">
                               <SafeChart data={myGroupData.chartData} height={256} barColor="#4f46e5" />
                             </div>
@@ -942,7 +921,7 @@
                       );
                     })()}
 
-                    {/* 탭 3: 학급 전체 결과 */}
+                    {/* 탭 3: 학급 전체 실험 결과 */}
                     {selectedStudentTab === 'class' && (() => {
                       const classData = getClassAggregate();
                       return (
@@ -952,7 +931,7 @@
                               <IconBarChart3 className="w-5 h-5 text-emerald-600" />
                               <span>학급 전체 상대도수 그래프 (합계: {classData.total}회)</span>
                             </h4>
-                            <p className="text-xs text-slate-500 mb-4">시행 횟수가 매우 커질 때 각 눈의 상대도수가 수학적 확률 1/6(≈0.167)에 가까워지는지 확인해 보세요.</p>
+                            <p className="text-xs text-slate-500 mb-4">학급 전체의 실험 데이터가 실시간으로 합산되어 표시됩니다.</p>
 
                             <div className="h-72 w-full">
                               <SafeChart data={classData.chartData} height={288} barColor="#10b981" />
@@ -1055,7 +1034,7 @@
                       <div className="flex items-center space-x-3 w-full md:w-auto">
                         <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><IconSettings className="w-5 h-5" /></div>
                         <div>
-                          <h4 className="text-sm font-bold text-slate-800">모둠 수 설정 및 자동 균등 배정</h4>
+                          <h4 className="text-sm font-bold text-slate-800">모둠 수 설정 및 자동 배정</h4>
                           <p className="text-xs text-slate-500">학생들을 원하는 개수의 모둠으로 자동 분배합니다.</p>
                         </div>
                       </div>
@@ -1173,7 +1152,7 @@
                               <IconBarChart3 className="w-5 h-5 text-indigo-600" />
                               <span>{activeGroupFilter}모둠 상대도수 그래프 (합계: {activeGroupData.total}회)</span>
                             </h4>
-                            <p className="text-xs text-slate-500 mb-4">모둠원 데이터가 실시간으로 합산되어 표시됩니다.</p>
+                            <p className="text-xs text-slate-500 mb-4">모둠원의 실험 데이터가 실시간으로 합산되어 표시됩니다.</p>
                             <div className="h-64 w-full">
                               <SafeChart data={activeGroupData.chartData} height={256} barColor="#4f46e5" />
                             </div>
@@ -1232,11 +1211,14 @@
                               </div>
                               <h3 className="text-2xl font-black">학급 전체 상대도수 수렴 현황</h3>
                               <p className="text-indigo-200 text-xs md:text-sm mt-1">
-                                학급 학생 {classData.studentCount}명의 주사위 데이터가 누적되어 총 <span className="text-yellow-300 font-black underline">{classData.total}회</span>의 대규모 시행이 이루어졌습니다.
+                                학급 학생 {classData.studentCount}명의 실험 데이터가 누적되어 총 <span className="text-yellow-300 font-black underline">{classData.total}회</span>의 대규모 시행이 이루어졌습니다. 시행 횟수가 매우 커질 때 각 눈의 상대도수가 수학적 확률 1/6(≈0.167)에 수렴하는지 확인해 볼까요?
                               </p>
                             </div>
 
                             <div className="bg-white/10 backdrop-blur-md px-6 py-4 rounded-xl border border-white/20 text-center">
+                              <span className="text-xs text-indigo-200 block">총 시행 횟수</span>
+                              <span className="text-2xl font-black text-yellow-300">{classData.total}회</span>
+                              <span className="text-slate-200">|</span>
                               <span className="text-xs text-indigo-200 block">목표 수렴값</span>
                               <span className="text-2xl font-black text-yellow-300">1/6 ≈ 0.167</span>
                             </div>
@@ -1248,7 +1230,7 @@
                                 <IconBarChart3 className="w-5 h-5 text-emerald-600" />
                                 <span>학급 전체 상대도수 그래프 (합계: {classData.total}회)</span>
                               </h4>
-                              <p className="text-xs text-slate-500 mb-4">시행 횟수가 매우 커질 때 각 눈의 상대도수가 수학적 확률 1/6(≈0.167)에 가까워지는지 확인해 보세요.</p>
+                              <p className="text-xs text-slate-500 mb-4">학급 전체의 실험 데이터가 실시간으로 합산되어 표시됩니다.</p>
 
                               <div className="h-72 w-full">
                                 <SafeChart data={classData.chartData} height={288} barColor="#10b981" />
@@ -1295,9 +1277,9 @@
                               <IconCheckCircle2 className="w-5 h-5 text-emerald-600" />
                               <span>수업 마무리 발문 가이드</span>
                             </h4>
-                            <ul className="space-y-2 text-xs md:text-sm text-emerald-900 font-medium list-disc list-inside">
+                            <ul className="space-y-2 text-xs md:text-sm text-emerald-900 font-medium list-disc list-outside pl-5">
                               <li>개인 실험 결과와 학급 전체 실험 결과({classData.total}회)로 나타나는 상대도수 그래프를 비교하고 차이점을 말해보세요.</li>
-                              <li>주사위 실험을 무수히 많이 반복하면 각 눈이 나온 횟수의 상대도수는 어떤 값에 가까워질까요?</li>
+                              <li>동일한 조건에서 주사위 실험을 무수히 많이 반복하면 각 눈이 나온 횟수의 상대도수는 어떤 값에 가까워질까요?</li>
                             </ul>
                           </div>
                         </div>
