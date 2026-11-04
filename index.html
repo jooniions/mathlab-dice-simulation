@@ -1233,7 +1233,10 @@
                                 <IconBarChart3 className="w-5 h-5 text-emerald-600" />
                                 <span>학급 전체 상대도수 그래프 (합계: {classData.total}회)</span>
                               </h4>
-                              <p className="text-xs text-slate-500 mb-4">학급 전체의 실험 데이터가 실시간으로 합산되어 표시됩니다.<br /><span style="color: #000080;">시행 횟수가 매우 커질 때</span> 각 눈의 상대도수가 <span style="color: #000080;">수학적 확률 1/6(≈0.167)</span>에 수렴하는지 관찰해 보세요.</p>
+                              <p className="text-xs text-slate-500 mb-4">
+                                학급 전체의 실험 데이터가 실시간으로 합산되어 표시됩니다.<br />
+                                <span style={{ color: '#000080' }}>시행 횟수가 매우 커질 때</span> 각 눈의 상대도수가 <span style={{ color: '#000080' }}>수학적 확률 1/6(≈0.167)</span>에 수렴하는지 관찰해 보세요.
+                              </p>
 
                               <div className="h-72 w-full">
                                 <SafeChart data={classData.chartData} height={288} barColor="#10b981" />
