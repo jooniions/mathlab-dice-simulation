@@ -802,7 +802,7 @@
                   </div>
 
                   <div className="lg:col-span-7 space-y-4">
-                    {/* [신규] 한 줄 탭 메뉴 (나의 결과, 모둠 결과, 학급 전체 결과) */}
+                    {/* [신규] 한 줄 탭 메뉴 (나의 실험 결과, 모둠 실험 결과, 학급 전체 실험 결과) */}
                         <div className="flex justify-center space-x-2 border-t border-slate-200 pt-3 overflow-x-auto">
                           <button onClick={() => setStudentTab('mine')} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${studentTab === 'mine' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}>
                             나의 실험 결과
@@ -1211,16 +1211,19 @@
                               </div>
                               <h3 className="text-2xl font-black">학급 전체 상대도수 수렴 현황</h3>
                               <p className="text-indigo-200 text-xs md:text-sm mt-1">
-                                학급 학생 {classData.studentCount}명의 실험 데이터가 누적되어 총 <span className="text-yellow-300 font-black underline">{classData.total}회</span>의 대규모 시행이 이루어졌습니다. 시행 횟수가 매우 커질 때 각 눈의 상대도수가 수학적 확률 1/6(≈0.167)에 수렴하는지 확인해 볼까요?
+                                학급 학생 {classData.studentCount}명의 주사위 데이터가 누적되어 총 <span className="text-yellow-300 font-black underline">{classData.total}회</span>의 대규모 시행이 이루어졌습니다.
                               </p>
                             </div>
 
-                            <div className="bg-white/10 backdrop-blur-md px-6 py-4 rounded-xl border border-white/20 text-center">
-                              <span className="text-xs text-indigo-200 block">총 시행 횟수</span>
-                              <span className="text-2xl font-black text-yellow-300">{classData.total}회</span>
-                              <span className="text-slate-200">|</span>
-                              <span className="text-xs text-indigo-200 block">목표 수렴값</span>
-                              <span className="text-2xl font-black text-yellow-300">1/6 ≈ 0.167</span>
+                            <div className="bg-white/10 backdrop-blur-md px-6 py-4 rounded-xl border border-white/20 flex items-center divide-x divide-white/20 text-center">
+                              <div className="pr-5">
+                                <span className="text-xs text-indigo-200 block mb-0.5">총 시행 횟수</span>
+                                <span className="text-2xl font-black text-white">{classData.total}회</span>
+                              </div>
+                              <div className="pl-5">
+                                <span className="text-xs text-indigo-200 block mb-0.5">목표 수렴값</span>
+                                <span className="text-2xl font-black text-yellow-300">1/6 ≈ 0.167</span>
+                              </div>
                             </div>
                           </div>
 
