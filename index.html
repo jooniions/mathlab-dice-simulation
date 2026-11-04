@@ -824,7 +824,7 @@
                               <IconBarChart3 className="w-5 h-5 text-indigo-600" />
                               <span>개인 상대도수 그래프</span>
                             </h4>
-                            <p className="text-xs text-slate-500">각 눈의 상대도수를 경우의 수의 비율 1/6(≈ 0.167)과 비교해보세요.</p>
+                            <p className="text-xs text-slate-500">각 눈의 상대도수를 빨간색 점선(경우의 수의 비율 1/6 ≈ 0.167)과 비교해보세요.</p>
                           </div>
                         </div>
 
@@ -1218,11 +1218,11 @@
                             <div className="bg-white/10 backdrop-blur-md px-6 py-4 rounded-xl border border-white/20 flex items-center divide-x divide-white/20 text-center">
                               <div className="pr-5">
                                 <span className="text-xs text-indigo-200 block mb-0.5">총 시행 횟수</span>
-                                <span className="text-2xl font-black text-white">{classData.total}회</span>
+                                <span className="text-2xl font-black text-yellow-300">{classData.total}회</span>
                               </div>
                               <div className="pl-5">
                                 <span className="text-xs text-indigo-200 block mb-0.5">목표 수렴값</span>
-                                <span className="text-2xl font-black text-yellow-300">1/6 ≈ 0.167</span>
+                                <span className="text-2xl font-black text-white">1/6 ≈ 0.167</span>
                               </div>
                             </div>
                           </div>
@@ -1233,7 +1233,7 @@
                                 <IconBarChart3 className="w-5 h-5 text-emerald-600" />
                                 <span>학급 전체 상대도수 그래프 (합계: {classData.total}회)</span>
                               </h4>
-                              <p className="text-xs text-slate-500 mb-4">학급 전체의 실험 데이터가 실시간으로 합산되어 표시됩니다.</p>
+                              <p className="text-xs text-slate-500 mb-4">학급 전체의 실험 데이터가 실시간으로 합산되어 표시됩니다. 시행 횟수가 매우 커질 때 각 눈의 상대도수가 수학적 확률 1/6(≈0.167)에 수렴하는지 관찰해 보세요.</p>
 
                               <div className="h-72 w-full">
                                 <SafeChart data={classData.chartData} height={288} barColor="#10b981" />
