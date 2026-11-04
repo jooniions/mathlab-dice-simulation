@@ -1211,7 +1211,7 @@
                               </div>
                               <h3 className="text-2xl font-black">학급 전체 상대도수 수렴 현황</h3>
                               <p className="text-indigo-200 text-xs md:text-sm mt-1">
-                                학급 학생 {classData.studentCount}명의 주사위 데이터가 누적되어 총 <span className="text-yellow-300 font-black underline">{classData.total}회</span>의 대규모 시행이 이루어졌습니다.
+                                학급 학생 <span className="text-yellow-300 font-black underline">{classData.studentCount}명</span>의 주사위 데이터가 누적되어 총 <span className="text-yellow-300 font-black underline">{classData.total}회</span>의 대규모 시행이 이루어졌습니다.
                               </p>
                             </div>
 
@@ -1233,7 +1233,7 @@
                                 <IconBarChart3 className="w-5 h-5 text-emerald-600" />
                                 <span>학급 전체 상대도수 그래프 (합계: {classData.total}회)</span>
                               </h4>
-                              <p className="text-xs text-slate-500 mb-4">학급 전체의 실험 데이터가 실시간으로 합산되어 표시됩니다. 시행 횟수가 매우 커질 때 각 눈의 상대도수가 수학적 확률 1/6(≈0.167)에 수렴하는지 관찰해 보세요.</p>
+                              <p className="text-xs text-slate-500 mb-4">학급 전체의 실험 데이터가 실시간으로 합산되어 표시됩니다.<br />시행 횟수가 매우 커질 때 각 눈의 상대도수가 수학적 확률 1/6(≈0.167)에 수렴하는지 관찰해 보세요.</p>
 
                               <div className="h-72 w-full">
                                 <SafeChart data={classData.chartData} height={288} barColor="#10b981" />
@@ -1281,7 +1281,7 @@
                               <span>수업 마무리 발문 가이드</span>
                             </h4>
                             <ul className="space-y-2 text-xs md:text-sm text-emerald-900 font-medium list-disc list-outside pl-5">
-                              <li>개인 실험 결과와 학급 전체 실험 결과({classData.total}회)로 나타나는 상대도수 그래프를 비교하고 차이점을 말해보세요.</li>
+                              <li>개인 실험 결과와 학급 전체 실험 결과(<strong>{classData.total}회</strong>)로 나타나는 상대도수 그래프를 비교하고 차이점을 말해보세요.</li>
                               <li>동일한 조건에서 주사위 실험을 무수히 많이 반복하면 각 눈이 나온 횟수의 상대도수는 어떤 값에 가까워질까요?</li>
                             </ul>
                           </div>
